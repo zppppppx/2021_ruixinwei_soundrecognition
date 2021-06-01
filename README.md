@@ -13,10 +13,15 @@
 ### 文件结构
 .
 ├─src
+
 │   ├─model
+
 │   │  └─__pycache__
+
 │   ├─utils(如音频信号特征的提取)
+
 │   └─__pycache__
+
 └─README.MD
 
 之后还要变
