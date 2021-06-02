@@ -4,3 +4,5 @@
 # some useless files#
 test.py
 test.wav
+__pycache__
+*.pyc
