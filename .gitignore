@@ -1,2 +1,6 @@
 # sound files #
 *.wav
+
+# some useless files#
+test.py
+test.wav
