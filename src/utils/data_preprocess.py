@@ -6,6 +6,7 @@ from scipy.io import wavfile
 import librosa
 import pandas as pd
 import os
+import csv
 
 class data_preprocess:
     """
@@ -96,7 +97,7 @@ class data_preprocess:
             filenames: a list of filenames in need of extraction.
             timestamps: similar to csvfile_resolution.
             labels: similar to csvfile_resolution.
-            dst_path: the file path to be saved as.
+            dst_path: the dst file you want to dump the results.
         """
         # handle the path issues
         dir = 'train' if train else 'val'
@@ -136,4 +137,56 @@ class data_preprocess:
                     if cnt%100 == 0:
                         print('{} sound fragments processed'.format(cnt))
 
-    
+
+    def frame_resolution(self, filenames, timestamps, labels, sr=16000, span=160, dst_path='tr_piece.csv'):
+        """
+        Identify a group of frames' label and save it to a csv file
+
+        Args:
+            filenames: similar to csvfile_resolution.
+            timestamps: similar to csvfile_resolution.
+            labels: similar to csvfile_resolution.
+            sr: sample rate of the wav file, 16000 default.
+            span: the number of frames that you want to categorize, 160 default which is 0.01 sec.
+            dst_path: the dst file you want to dump the results.
+        """
+        classes = ['CLEAN_SPEECH', 'SPEECH_WITH_MUSIC', 'SPEECH_WITH_NOISE', 'NO_SPEECH']
+        dst_path = os.path.join(self.root_path, dst_path)
+
+        with open(dst_path, "w", newline="") as f:
+            csv_writer = csv.writer(f)
+            csv_writer.writerow(['id', 's', 'e', 'label', 'label_index'])
+        
+            # walk through all the files
+            cnt = 0
+            for i in range(len(filenames)):
+                filename = filenames[i]
+                sound_path = os.path.join(self.root_path, dir, filename+'.wav')
+                try:
+                    sample_rate, sig = wavfile.read(sound_path)
+                
+                except Exception as e:
+                    print("Error encountered while parsing file: ", sound_path)
+                    return None
+                
+                timestamp = timestamps[i]
+                label = labels[i]
+
+                # walk through all the labels
+                for j in range(len(label)):
+                    lb = label[j]
+                    s, e = timestamp[j]
+                    number_frags = round((e-s)*sr/span)
+
+                    # walk through each sound segment and separate it into frames pieces
+                    for k in range(number_frags):
+                        s_k = s + k*(span/sr)
+                        e_k = s_k + span/sr
+                        csv_writer.writerow([filename, str(s_k), str(e_k), classes[lb], str(lb)])
+                        cnt += 1
+
+                        if cnt%1000 == 0:
+                            print('{} sets of frames have been processed'.format(cnt))
+
+        print('Segments resoluted!')
+                    

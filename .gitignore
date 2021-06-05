@@ -6,3 +6,7 @@ test.py
 test.wav
 __pycache__
 *.pyc
+
+# some training files #
+*.txt
+tr_piece.csv
