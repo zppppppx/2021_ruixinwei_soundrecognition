@@ -161,14 +161,6 @@ class data_preprocess:
             cnt = 0
             for i in range(len(filenames)):
                 filename = filenames[i]
-                sound_path = os.path.join(self.root_path, dir, filename+'.wav')
-                try:
-                    sample_rate, sig = wavfile.read(sound_path)
-                
-                except Exception as e:
-                    print("Error encountered while parsing file: ", sound_path)
-                    return None
-                
                 timestamp = timestamps[i]
                 label = labels[i]
 
@@ -185,8 +177,8 @@ class data_preprocess:
                         csv_writer.writerow([filename, str(s_k), str(e_k), classes[lb], str(lb)])
                         cnt += 1
 
-                        if cnt%1000 == 0:
+                        if cnt%20000 == 0:
                             print('{} sets of frames have been processed'.format(cnt))
 
-        print('Segments resoluted!')
+        print('Segments resoluted! And the total number of  fragments is {}'.format(cnt))
                     
