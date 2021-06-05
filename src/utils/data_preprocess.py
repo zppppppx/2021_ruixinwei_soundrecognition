@@ -45,7 +45,7 @@ class data_preprocess:
         segment = segment/(2.0**bitwidth)
 
         # extract the mfcc feature
-        mfccs = librosa.feature.mfcc(y=segment, sr=sample_rate, n_mfcc=24)
+        mfccs = librosa.feature.mfcc(y=segment, sr=sample_rate, n_mfcc=40)
         mfccsscaled = np.mean(mfccs.T,axis=0)
         
         return mfccsscaled
