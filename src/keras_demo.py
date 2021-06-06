@@ -17,7 +17,7 @@ dst_path_val = 'mfcc_val.txt'
 
 data_processor = data_preprocess.data_preprocess(root_path)
 filenames, timestamps, labels = data_processor.csvfile_resolution('train_labels.csv')
-data_processor.feature_extract(filenames, timestamps, labels, dst_path)
+data_processor.feature_extract(filenames, timestamps, labels, dst_path_tr)
 train_labels, train_features = data_processor.feature_load(dst_path_tr)
 
 filenames, timestamps, labels = data_processor.csvfile_resolution('val_labels.csv')
