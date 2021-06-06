@@ -88,7 +88,7 @@ class data_preprocess:
         return filenames, timestamps, labels
 
     
-    def feature_extract(self, filenames, timestamps, labels, dst_path, train=True):
+    def feature_extract(self, filenames, timestamps, labels, dst_path='mfcc_train.txt', train=True):
         """
         Extract the feature of the sound fragment and save it to a txt or csv file.
 
@@ -137,6 +137,35 @@ class data_preprocess:
                     if cnt%100 == 0:
                         print('{} sound fragments processed'.format(cnt))
 
+
+    def feature_load(self, filename='mfcc_train.txt'):
+        """
+        Load data from feature file.
+
+        Args:
+            filename: the file saving features.
+
+        Return:
+            labels: numpy arrays marking the labels
+            features: numpy arrays of features
+        """
+        filename = os.path.join(self.root_path, filename)
+
+        labels = []
+        features = []
+        with open(filename, 'r') as f:
+            data = f.readlines()
+            for row_data in data:
+                row_data = row_data.rstrip()
+                label, feature = row_data.split('\t')
+                feature = feature.split(' ')
+                feature = [float(i) for i in feature]
+                feature = np.array(feature)
+
+                features.append(feature)
+                labels.append(label)
+
+        return  np.array(labels), np.array(features)
 
     def frame_resolution(self, filenames, timestamps, labels, sr=16000, span=160, dst_path='tr_piece.csv'):
         """
