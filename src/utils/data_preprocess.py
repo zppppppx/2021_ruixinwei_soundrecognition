@@ -11,7 +11,7 @@ import csv
 class data_preprocess:
     """
     Define the class of data preprocess to better resolute the data.
-    Including sound_load, csv_resolution
+    Including feature_extract, csv_resolution
     """
     def  __init__(self, root_path='../data'):
         """
@@ -23,7 +23,30 @@ class data_preprocess:
         self.root_path = root_path
 
 
-    def sound_load(self, sample_rate, sig, start, end):
+    def sound_frag_load(self, filename, start=0, end=-1):
+        """
+        Simply load a piece of data with timestamps input.
+
+        Args:
+            filename: the wav file in need of reading.
+            start: the start of the sound fragment, in unit of sec.
+            end: the end of the sound fragment, in unit of sec.
+
+        Return:
+            segment: a numpy array consisting of a sound fragment.
+            sample_rate: a number marking the sample rate.
+        """
+        sample_rate, sig = wavfile.read(filename)
+        
+        if end == -1:
+            return sample_rate, sig
+        
+        start, end = int(start*sample_rate), int(end*sample_rate)
+        segment = sig[start:end]
+        return sample_rate, segment
+
+
+    def feature_extract(self, sample_rate, sig, start, end):
         """
         Load sound data from the files with specific segment notated by start and end in time.
         And then extract the features of mfccs.
@@ -71,6 +94,9 @@ class data_preprocess:
 
         timestamps = []
         labels = []
+        file_nums = len(raw_data)
+
+        cnt = 0
         for filename in filenames:
             datapiece = raw_data[['s', 'e', 'label_index']][raw_data['id'] == filename]
             timestamp = []
@@ -81,14 +107,19 @@ class data_preprocess:
                 stamp = datapiece[['s', 'e']].iloc[i].values
                 timestamp.append(np.round(stamp, 2))
                 label.append(datapiece['label_index'].iloc[i])
+                
+                cnt += 1
+                if cnt % 20000 == 0:
+                    print("{} pieces have been loaded in and {} are left".format(cnt, file_nums-cnt))
 
             timestamps.append(np.array(timestamp, dtype=np.float32))
             labels.append(np.array(label, dtype=np.int8))
+        print('Resolution finished!')
         
         return filenames, timestamps, labels
 
     
-    def feature_extract(self, filenames, timestamps, labels, dst_path='mfcc_train.txt', train=True):
+    def feature_to_file(self, filenames, timestamps, labels, dst_path='mfcc_train.txt', train=True):
         """
         Extract the feature of the sound fragment and save it to a txt or csv file.
 
@@ -123,7 +154,7 @@ class data_preprocess:
 
                 # walk through all the labels
                 for j in range(len(label)):
-                    mfcc_features = self.sound_load(sample_rate, sig, timestamp[j][0], timestamp[j][1])
+                    mfcc_features = self.feature_extract(sample_rate, sig, timestamp[j][0], timestamp[j][1])
                     classification = label[j]
                     row_data = str(classification) + '\t'
                     # elements = [str(element) + ' ' for element in mfcc_features]
@@ -136,6 +167,8 @@ class data_preprocess:
                     cnt += 1
                     if cnt%100 == 0:
                         print('{} sound fragments processed'.format(cnt))
+
+        print('File has been created')
 
 
     def feature_load(self, filename='mfcc_train.txt'):
