@@ -10,3 +10,4 @@ __pycache__
 # some training files #
 *.txt
 tr_piece.csv
+val_piece.csv
