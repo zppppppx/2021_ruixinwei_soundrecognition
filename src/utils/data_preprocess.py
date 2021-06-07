@@ -186,8 +186,10 @@ class data_preprocess:
 
         labels = []
         features = []
+        cnt = 0
         with open(filename, 'r') as f:
             data = f.readlines()
+            total_num = len(data)
             for row_data in data:
                 row_data = row_data.rstrip()
                 label, feature = row_data.split('\t')
@@ -197,6 +199,11 @@ class data_preprocess:
 
                 features.append(feature)
                 labels.append(label)
+
+                cnt += 1
+                if cnt % int(0.001*total_num) == 0:
+                    print('{0:.1f}%% features have been loaded in and {1:.1f}%% are left.'.\
+                        format(cnt/total_num*100, (total_num-cnt)/total_num*100))
 
         return  np.array(labels), np.array(features)
 

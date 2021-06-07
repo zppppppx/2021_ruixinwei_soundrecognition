@@ -34,11 +34,12 @@ train_labels, train_features = data_processor.feature_load(dst_path_tr)
 # filenames, timestamps, labels = data_processor.csvfile_resolution('val_labels.csv')
 # data_processor.frame_resolution(filenames, timestamps, labels, sr=16000, span=160, dst_path='val_piece.csv')
 # filenames, timestamps, labels = data_processor.csvfile_resolution('val_piece.csv')
-data_processor.feature_to_file(filenames, timestamps, labels, dst_path_val, train=False)
+# data_processor.feature_to_file(filenames, timestamps, labels, dst_path_val, train=False)
 val_labels, val_features = data_processor.feature_load(dst_path_val)
 
 train_features = train_features.astype(np.float32)
 val_features = val_features.astype(np.float32)
+print(val_features.shape)
 
 from sklearn.preprocessing import LabelEncoder
 from keras.utils import to_categorical
@@ -46,7 +47,7 @@ le = LabelEncoder()
 val_labels = to_categorical(le.fit_transform(val_labels))
 train_labels = to_categorical(le.fit_transform(train_labels))
 
-num_rows = 24
+num_rows = 40
 num_columns = 1
 num_channels = 1
 
@@ -92,7 +93,7 @@ accuracy = 100*score[1]
 
 print("Pre-training accuracy: %.4f%%" % accuracy)
 
-num_epochs = 72
+num_epochs = 36
 num_batch_size = 256
 
 checkpointer = ModelCheckpoint(filepath='saved_models/weights.best.basic_cnn.hdf5', 
