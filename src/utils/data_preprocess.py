@@ -2,7 +2,8 @@ from librosa import feature
 import numpy as np
 from numpy.lib.function_base import extract
 from scipy.fftpack.realtransforms import dst
-from scipy.io import wavfile
+import torchaudio
+from torchaudio import transforms
 import librosa
 import pandas as pd
 import os
@@ -36,8 +37,9 @@ class data_preprocess:
             segment: a numpy array consisting of a sound fragment.
             sample_rate: a number marking the sample rate.
         """
-        sample_rate, sig = wavfile.read(filename)
-        
+        sig, sample_rate = torchaudio.load(filename)
+        sig = sig.numpy().reshape(-1)
+
         if end == -1:
             return sample_rate, sig
         
@@ -143,7 +145,8 @@ class data_preprocess:
                 filename = filenames[i]
                 sound_path = os.path.join(self.root_path, dir, filename+'.wav')
                 try:
-                    sample_rate, sig = wavfile.read(sound_path)
+                    sig, sample_rate = torchaudio.load(sound_path)
+                    sig = sig.numpy().reshape(-1)
                 
                 except Exception as e:
                     print("Error encountered while parsing file: ", sound_path)
