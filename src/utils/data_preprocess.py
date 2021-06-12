@@ -8,6 +8,7 @@ import librosa
 import pandas as pd
 import os
 import csv
+from scipy.io import wavfile
 
 class data_preprocess:
     """
@@ -22,6 +23,7 @@ class data_preprocess:
             root_path: the path of the data source
         """
         self.root_path = root_path
+        self.classes = ['CLEAN_SPEECH', 'SPEECH_WITH_MUSIC', 'SPEECH_WITH_NOISE', 'NO_SPEECH']
 
 
     def sound_frag_load(self, filename, start=0, end=-1):
@@ -253,4 +255,41 @@ class data_preprocess:
                             print('{} sets of frames have been processed'.format(cnt))
 
         print('Segments resoluted! And the total number of  fragments is {}'.format(cnt))
+
+    def audio_split(self, filenames, timestamps, labels, train=True):
+        """
+        Split the wavfiles into isolated fragments
+
+        Args:
+            filenames: similar to csvfile_resolution.
+            timestamps: similar to csvfile_resolution.
+            labels: similar to csvfile_resolution.
+        """
+        audio_nums = [0, 0, 0, 0]
+        src_path = os.path.join(self.root_path, 'train' if train else 'val')
+
+        # walk through every file
+        for i in range(len(filenames)):
+            filename = filenames[i]
+            file_path = os.path.join(src_path, filename+'.wav')
+            stamp = timestamps[i]
+            label = labels[i]
+            sr, data = wavfile.read(file_path)
+
+            # walk through every fragment
+            for j in range(len(label)):
+                timestamp = stamp[j]
+                start, end = int(timestamp[0]*sr), int(timestamp[1]*sr)
+                fragment = data[start:end]
+                piece_name = str(label[j])+ '_'+ str(audio_nums[label[j]]) + '.wav'
+                dst_path = os.path.join(self.root_path, 'train_seg', piece_name)
+                wavfile.write(dst_path, sr, fragment)
+                audio_nums[label[j]] += 1
+
+                cnt = sum(audio_nums)
+                if cnt % 2000 == 0:
+                    print('{} pieces have been split out!'.format(cnt))
+
+        print('Split finished! And the numbers of each class are [{}, {}, {}, {}]'
+                .format(audio_nums[0], audio_nums[1], audio_nums[2], audio_nums[3],))
                     

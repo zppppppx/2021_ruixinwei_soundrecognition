@@ -51,34 +51,42 @@ num_rows = 40
 num_columns = 1
 num_channels = 1
 
-train_features = train_features.reshape(train_features.shape[0], num_rows, num_columns, num_channels)
-val_features = val_features.reshape(val_features.shape[0], num_rows, num_columns, num_channels)
+# train_features = train_features.reshape(train_features.shape[0], num_rows, num_columns, num_channels)
+# val_features = val_features.reshape(val_features.shape[0], num_rows, num_columns, num_channels)
+train_features = train_features.reshape(train_features.shape[0], num_rows)
+val_features = val_features.reshape(val_features.shape[0], num_rows)
+input_shape = (40,)
 
 num_labels = 4
 filter_size = 2
 
 # Construct model 
+# model = Sequential()
+# model.add(Conv1D(filters=16, kernel_size=2, input_shape=(num_rows, num_channels), activation='relu'))
+# model.add(MaxPooling1D(pool_size=2))
+# model.add(Dropout(0.2))
+
+# model.add(Conv1D(filters=32, kernel_size=2, activation='relu'))
+# model.add(MaxPooling1D(pool_size=2))
+# model.add(Dropout(0.2))
+
+# model.add(Conv1D(filters=64, kernel_size=2, activation='relu'))
+# model.add(MaxPooling1D(pool_size=2))
+# model.add(Dropout(0.2))
+
+# model.add(Conv1D(filters=128, kernel_size=2, activation='relu'))
+# model.add(MaxPooling1D(pool_size=2))
+# model.add(Dropout(0.2))
+# model.add(GlobalAveragePooling1D())
+
+# model.add(Dense(num_labels, activation='softmax'))
+
 model = Sequential()
-model.add(Conv1D(filters=16, kernel_size=2, input_shape=(num_rows, num_channels), activation='relu'))
-model.add(MaxPooling1D(pool_size=2))
-model.add(Dropout(0.2))
-
-model.add(Conv1D(filters=32, kernel_size=2, activation='relu'))
-model.add(MaxPooling1D(pool_size=2))
-model.add(Dropout(0.2))
-
-model.add(Conv1D(filters=64, kernel_size=2, activation='relu'))
-model.add(MaxPooling1D(pool_size=2))
-model.add(Dropout(0.2))
-
-model.add(Conv1D(filters=128, kernel_size=2, activation='relu'))
-model.add(MaxPooling1D(pool_size=2))
-model.add(Dropout(0.2))
-model.add(GlobalAveragePooling1D())
-
+model.add(Dense(256, activation="relu", input_shape=input_shape))
+model.add(Dense(128, activation="relu", input_shape=input_shape))
+model.add(Dense(64, activation="relu", input_shape=input_shape))
+model.add(Dense(32, activation="relu", input_shape=input_shape))
 model.add(Dense(num_labels, activation='softmax'))
-
-
 
 #################################
 
