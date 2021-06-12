@@ -291,5 +291,5 @@ class data_preprocess:
                     print('{} pieces have been split out!'.format(cnt))
 
         print('Split finished! And the numbers of each class are [{}, {}, {}, {}]'
-                .format(audio_nums[0], audio_nums[1], audio_nums[2], audio_nums[3],))
+                .format(audio_nums[0], audio_nums[1], audio_nums[2], audio_nums[3]))
                     
