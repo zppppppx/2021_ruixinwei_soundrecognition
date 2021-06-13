@@ -13,9 +13,10 @@ waveform, sample_rate = torchaudio.load(wav_file)
 
 MFCC = transforms.MFCC(n_mfcc=128, melkwargs={'n_mels':128, 'win_length':320, 'hop_length':160, 'n_fft':1024 })(waveform[0][:])
 
+
 print(waveform.shape)
 # print(mel_specgram.shape)
-print('MFCC is: ', MFCC.shape)
+print('MFCC is: ', MFCC)
 
 sr, sig = wavfile.read(wav_file)
 print(sig)
