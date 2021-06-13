@@ -206,7 +206,7 @@ class data_preprocess:
                 labels.append(label)
 
                 cnt += 1
-                if cnt % int(0.001*total_num) == 0:
+                if cnt % int(0.001*total_num+1) == 0:
                     print('{0:.1f}%% features have been loaded in and {1:.1f}%% are left.'.\
                         format(cnt/total_num*100, (total_num-cnt)/total_num*100))
 
@@ -293,3 +293,35 @@ class data_preprocess:
         print('Split finished! And the numbers of each class are [{}, {}, {}, {}]'
                 .format(audio_nums[0], audio_nums[1], audio_nums[2], audio_nums[3]))
                     
+
+    def audio_padding(self, src_path, dst_path, frame_length):
+        """
+        Padding the wav data in order to fit the size of ANN's input.
+
+        Args:
+            src_path: the path of directory in need of padding.
+            dst_path: the path or target directory for saving padded audios.
+            frame_length: the audio's length should be multiple of this arg.
+        """
+        src_path = os.path.join(self.root_path, src_path)
+        dst_path = os.path.join(self.root_path, dst_path)
+        if not os.path.exists(dst_path):
+            os.mkdir(dst_path)
+        files = os.listdir(src_path)
+        
+        cnt = 0
+        total_num = len(files)
+        for wav in files:
+            wav_src = os.path.join(src_path, wav)
+            sr, data = wavfile.read(wav_src)
+            data_length = len(data)
+            padding_length = frame_length - data_length % frame_length
+            data = np.pad(data, (0, padding_length), mode='symmetric')
+            data = data[:-160]
+
+            wav_dst = os.path.join(dst_path, wav)
+            wavfile.write(wav_dst, sr, data)
+
+            cnt += 1
+            if cnt % 2000 == 0:
+                print('{} pieces have been padded and {} are left'.format(cnt, total_num-cnt))

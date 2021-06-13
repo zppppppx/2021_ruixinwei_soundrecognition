@@ -6,11 +6,13 @@ import scipy.io.wavfile as wavfile
 
 torchaudio.set_audio_backend("soundfile")
 
-wav_file = r'E:\projects\ruixinwei\2021rui\2021_ruixinwei_soundrecognition\data\train\_a9SWtcaNj8.wav'
+wav_file = r'E:\projects\ruixinwei\2021rui\2021_ruixinwei_soundrecognition\data\train_padded\0_278.wav'
 waveform, sample_rate = torchaudio.load(wav_file)
 # print(waveform.shape)
 # mel_specgram = transforms.MelSpectrogram(sample_rate)(waveform)
-MFCC = transforms.MFCC(n_mfcc=128, melkwargs={'n_mels':128, 'win_length':320, 'hop_length':160, 'n_fft':1024 })(waveform[0][:20320])
+
+MFCC = transforms.MFCC(n_mfcc=128, melkwargs={'n_mels':128, 'win_length':320, 'hop_length':160, 'n_fft':1024 })(waveform[0][:])
+
 print(waveform.shape)
 # print(mel_specgram.shape)
 print('MFCC is: ', MFCC.shape)
