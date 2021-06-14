@@ -267,6 +267,7 @@ class data_preprocess:
         """
         audio_nums = [0, 0, 0, 0]
         src_path = os.path.join(self.root_path, 'train' if train else 'val')
+        savepath = 'train_seg' if train else 'val_seg'
 
         # walk through every file
         for i in range(len(filenames)):
@@ -282,7 +283,7 @@ class data_preprocess:
                 start, end = int(timestamp[0]*sr), int(timestamp[1]*sr)
                 fragment = data[start:end]
                 piece_name = str(label[j])+ '_'+ str(audio_nums[label[j]]) + '.wav'
-                dst_path = os.path.join(self.root_path, 'train_seg', piece_name)
+                dst_path = os.path.join(self.root_path, savepath, piece_name)
                 wavfile.write(dst_path, sr, fragment)
                 audio_nums[label[j]] += 1
 

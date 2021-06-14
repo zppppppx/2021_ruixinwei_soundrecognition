@@ -13,8 +13,8 @@ class data_resolute(object):
     """
     def __init__(self, root_path, feature_file, label_file):
         self.root_path = root_path
-        self.feature_file = feature_file
-        self.label_file = label_file
+        self.feature_file = os.path.join(self.root_path, feature_file)
+        self.label_file = os.path.join(self.root_path, label_file)
 
     @staticmethod
     def features_and_labels(soundfile, frag_length=128):
@@ -75,7 +75,7 @@ class data_resolute(object):
 
         np.save(self.feature_file, MFCCs.numpy()) 
         np.save(self.label_file, labels.numpy())
-        print('Loading finished!')
+        print('Loading into files finished!')
 
 
     def load_features_labels(self):
@@ -90,7 +90,8 @@ class data_resolute(object):
         """
         MFCCs = torch.from_numpy(np.load(self.feature_file))
         labels = torch.from_numpy(np.load(self.label_file))
-        return MFCCs, labels
+        'Loading from files finished!'
+        return MFCCs.view(-1,1,128,128), labels.long()
         
         
                 
@@ -113,11 +114,23 @@ class MFCCDataset(Dataset):
     def __len__(self):
         return(len(self.labels))
 
+root_path = r'E:\projects\ruixinwei\2021rui\2021_ruixinwei_soundrecognition\data'
+train_file = r'MFCCs_train.npy'
+train_label_file = r'labels_train.npy'
+val_file = r'MFCCs_val.npy'
+val_label_file = r'labels_val.npy'
+traindata = MFCCDataset(root_path=root_path, feature_file=train_file, label_file=train_label_file)
+trainloader = DataLoader(dataset=traindata, batch_size=256, shuffle=True)
+valdata = MFCCDataset(root_path=root_path, feature_file=val_file, label_file=val_label_file)
+valloader = DataLoader(dataset=traindata, batch_size=256, shuffle=True)
+
+
+
 if __name__ == '__main__':
     root_path = r'E:\projects\ruixinwei\2021rui\2021_ruixinwei_soundrecognition\data'
-    feature_file = r'E:\projects\ruixinwei\2021rui\2021_ruixinwei_soundrecognition\data\MFCCs_train.npy'
-    label_file = r'E:\projects\ruixinwei\2021rui\2021_ruixinwei_soundrecognition\data\labels_train.npy'
-    src_path = r'train_padded'
+    feature_file = r'E:\projects\ruixinwei\2021rui\2021_ruixinwei_soundrecognition\data\MFCCs_val.npy'
+    label_file = r'E:\projects\ruixinwei\2021rui\2021_ruixinwei_soundrecognition\data\labels_val.npy'
+    src_path = r'val_padded'
     opt = data_resolute(root_path, feature_file, label_file)
     opt.dir_resolution(src_path)
     mfcc = MFCCDataset(root_path, feature_file, label_file)

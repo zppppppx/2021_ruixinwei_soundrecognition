@@ -11,3 +11,4 @@ __pycache__
 *.txt
 tr_piece.csv
 val_piece.csv
+*.npy
