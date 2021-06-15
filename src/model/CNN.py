@@ -46,7 +46,7 @@ device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
 criterion = torch.nn.CrossEntropyLoss().to(device)
 cnn = CNN(4).to(device)
 optimizer = optim.Adam(cnn.parameters(), lr=0.00018964, weight_decay=0.0000019156)
-model_path = r'E:\projects\ruixinwei\2021rui\2021_ruixinwei_soundrecognition\data\cnn.pkl'
+model_path = r'E:\projects\ruixinwei\2021rui\2021_ruixinwei_soundrecognition\saved_models\cnn.pkl'
 
 # for epoch in range(50):
 #     running_loss = 0.
@@ -77,6 +77,7 @@ with torch.no_grad():
         images, labels = data[0].to(device), data[1].to(device)
         outputs = cnn(images)
         _, predicted = torch.max(outputs.data, 1)
+        print(predicted.shape)
         total += labels.size(0)
         correct += (predicted == labels).sum().item()
 
