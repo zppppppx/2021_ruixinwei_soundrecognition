@@ -337,8 +337,7 @@ class data_preprocess:
                 csv_path: the path of the real csv file, file name is needed only
             """
             csv_path = os.path.join(self.root_path, csv_path)
-            raw_data = pd.read_csv(csv_path)
-            (audio_name, Extention) = audio_name.split('.')
+            (audio_name, _) = audio_name.split('.')
             raw_data = pd.read_csv(csv_path)
             audio_data = raw_data[raw_data['id'] == audio_name]
             rate = 16000
