@@ -9,6 +9,7 @@ import pandas as pd
 import os
 import csv
 from scipy.io import wavfile
+import matplotlib.pyplot as plt
 
 class data_preprocess:
     """
@@ -326,3 +327,48 @@ class data_preprocess:
             cnt += 1
             if cnt % 2000 == 0:
                 print('{} pieces have been padded and {} are left'.format(cnt, total_num-cnt))
+
+    def data_visualize(self, audio_name, csv_path):
+            """
+            Visualize the data
+
+            Args:
+                audio_name: audio need to be found
+                csv_path: the path of the real csv file, file name is needed only
+            """
+            csv_path = os.path.join(self.root_path, csv_path)
+            raw_data = pd.read_csv(csv_path)
+            (audio_name, Extention) = audio_name.split('.')
+            raw_data = pd.read_csv(csv_path)
+            audio_data = raw_data[raw_data['id'] == audio_name]
+            rate = 16000
+            analyse_start_time = int(input('输入开始时间：\n'))
+            analyse_end_time = int(input('输入结束时间：\n'))
+            time = analyse_end_time - analyse_start_time
+            if audio_data.empty:
+                print('No such audio data!')
+            else:
+                labels = list(audio_data['label'])
+                index = list(audio_data['label_index'])
+                index_dict = {
+                    0: 1,
+                    1: 1,
+                    2: 1,
+                    3: 0
+                }
+                thresh_index = [index_dict[x] if x in index_dict else x for x in index]
+                start_time = list(audio_data['s'])
+                end_time = list(audio_data['e'])
+                x_label = list(range(rate*time))
+                y_label = [0] * rate * time
+                k = 0
+                for i in range(rate*analyse_start_time, rate*analyse_end_time):
+                    if start_time[k] <= float(i/rate) < end_time[k]:
+                        y_label[i] = thresh_index[k]
+                    elif k == len(thresh_index) - 1 and float(i/rate) >= end_time[k]:
+                        break
+                    else:
+                        k += 1
+                plt.figure(figsize=(30, 10))
+                plt.plot(x_label, y_label)
+                plt.show()
