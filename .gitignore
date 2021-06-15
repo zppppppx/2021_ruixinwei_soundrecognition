@@ -6,6 +6,7 @@ test.py
 test.wav
 __pycache__
 *.pyc
+cnn_bak.pkl
 
 # some training files #
 *.txt

@@ -1,9 +1,8 @@
-% clc;clear;close all;
+clc;clear;close all;
 %%  导入表格
-root = '../../data/';
-csvfile = input('清时输入你要查找的csv文件路径，根目录已设置为/data/ \n','s');
-csvfile = [root, csvfile];
-Data = readtable(csvfile);
+str = '../../data/';
+csvfile = input('清时输入你要查找的csv文件路径，');
+Data = readtable('../../data/val_labels.csv');
 id = cell2mat(table2array(Data(:,1)));
 id = reshape(id',1,[]);
 s = table2array(Data(:,2));

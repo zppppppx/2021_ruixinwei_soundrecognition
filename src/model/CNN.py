@@ -2,11 +2,9 @@ import torch
 import torch.nn as nn
 import torch.nn.functional as F
 import torch.optim as optim
-from CNN_dataset import *
 
-print(root_path)
-print(torch.__version__)
-print(torch.cuda.is_available())
+from model.CNN_dataset import *
+
 
 class CNN(nn.Module):
     def __init__(self, classnums):
@@ -41,45 +39,45 @@ class CNN(nn.Module):
 # label_file = r'labels_train.npy'
 # cnn_data = CNN_dataset.MFCCDataset(root_path=root_path, feature_file=feature_file, label_file=label_file)
 
+if __name__ == '__main__':
+    device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
+    criterion = torch.nn.CrossEntropyLoss().to(device)
+    cnn = CNN(4).to(device)
+    optimizer = optim.Adam(cnn.parameters(), lr=0.00018964, weight_decay=0.0000019156)
+    model_path = r'E:\projects\ruixinwei\2021rui\2021_ruixinwei_soundrecognition\saved_models\cnn.pkl'
 
-device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
-criterion = torch.nn.CrossEntropyLoss().to(device)
-cnn = CNN(4).to(device)
-optimizer = optim.Adam(cnn.parameters(), lr=0.00018964, weight_decay=0.0000019156)
-model_path = r'E:\projects\ruixinwei\2021rui\2021_ruixinwei_soundrecognition\saved_models\cnn.pkl'
+    # for epoch in range(50):
+    #     running_loss = 0.
+    #     for idx, data in enumerate(trainloader, 0):
+    #         inputs, labels = data[0].to(device), data[1].to(device)
+            
+    #         optimizer.zero_grad()
+            
+    #         outputs = cnn(inputs)
+    #         loss = criterion(outputs, labels)
+    #         loss.backward()
+    #         optimizer.step()
+    #         running_loss += loss.item()
+            
+    #         if idx % 100 == 99:
+    #             print('[epoch %d, batch_idx %d: loss %.3f'
+    #                  %(epoch, idx, running_loss/400))
+    #             running_loss = 0.
 
-# for epoch in range(50):
-#     running_loss = 0.
-#     for idx, data in enumerate(trainloader, 0):
-#         inputs, labels = data[0].to(device), data[1].to(device)
-        
-#         optimizer.zero_grad()
-        
-#         outputs = cnn(inputs)
-#         loss = criterion(outputs, labels)
-#         loss.backward()
-#         optimizer.step()
-#         running_loss += loss.item()
-        
-#         if idx % 100 == 99:
-#             print('[epoch %d, batch_idx %d: loss %.3f'
-#                  %(epoch, idx, running_loss/400))
-#             running_loss = 0.
+    # torch.save(cnn.state_dict(), model_path)
 
-# torch.save(cnn.state_dict(), model_path)
+    cnn.load_state_dict(torch.load(model_path))
 
-cnn.load_state_dict(torch.load(model_path))
+    correct = 0
+    total = 0
+    with torch.no_grad():
+        for data in valloader:
+            images, labels = data[0].to(device), data[1].to(device)
+            outputs = cnn(images)
+            _, predicted = torch.max(outputs.data, 1)
+            print(predicted.shape)
+            total += labels.size(0)
+            correct += (predicted == labels).sum().item()
 
-correct = 0
-total = 0
-with torch.no_grad():
-    for data in valloader:
-        images, labels = data[0].to(device), data[1].to(device)
-        outputs = cnn(images)
-        _, predicted = torch.max(outputs.data, 1)
-        print(predicted.shape)
-        total += labels.size(0)
-        correct += (predicted == labels).sum().item()
-
-print('Accuracy of the network on the all val inputs: %d %%' % (
-    100 * correct / total))
+    print('Accuracy of the network on the all val inputs: %d %%' % (
+        100 * correct / total))
