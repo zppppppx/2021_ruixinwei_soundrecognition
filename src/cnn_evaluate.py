@@ -6,6 +6,7 @@ import numpy as np
 import csv
 from utils import data_preprocess
 import matplotlib.pyplot as plt
+import os
 
 def fill_and_extract(sound_file, frame_length=128, method='series', padding_mode='constant', saving=False):
     """
@@ -147,7 +148,7 @@ def frame_fuse(predicts, frame_length=128):
     return timestamps, classes
 
 
-def csv_generate(sound_file: str, timestamps: list, classes: list, csv_file='../data/for_val/val_pre.csv'):
+def csv_generate(sound_file: str, timestamps: list, classes: list, mode: bool, csv_file='../data/for_val/val_pre.csv'):
     """
     Write the results into csvfiles.
 
@@ -158,42 +159,63 @@ def csv_generate(sound_file: str, timestamps: list, classes: list, csv_file='../
         csv_file: destination csv file we want to write into
     """
     Main_classes = ['CLEAN_SPEECH', 'SPEECH_WITH_MUSIC', 'SPEECH_WITH_NOISE', 'NO_SPEECH']
-    fp = open(csv_file, 'w', newline="")
-    fp_writer = csv.writer(fp)
-    fp_writer.writerow(['id', 's', 'e', 'label', 'label_index'])
-    id = sound_file.split('/')[-1].split('.')[0]
-    for i in range(len(classes)):
-        s, e = str(timestamps[i][0]), str(timestamps[i][1])
-        label = Main_classes[classes[i]]
-        label_index = str(classes[i])
-        fp_writer.writerow([id, s, e, label, label_index])
+    if mode:
+        fp = open(csv_file, 'w', newline="")
+        fp_writer = csv.writer(fp)
+        fp_writer.writerow(['id', 's', 'e', 'label', 'label_index'])
+        id = sound_file.split('/')[-1].split('.')[0]
+        for i in range(len(classes)):
+            s, e = str(timestamps[i][0]), str(timestamps[i][1])
+            label = Main_classes[classes[i]]
+            label_index = str(classes[i])
+            fp_writer.writerow([id, s, e, label, label_index])
+        fp.close()
+        print('CSV file has been generated successfully!')
 
-    fp.close()
-    print('CSV file has been generated successfully!')
+    else:
+        fp = open(csv_file, 'a', newline="")
+        fp_writer = csv.writer(fp)
+        id = sound_file.split('/')[-1].split('.')[0]
+        for i in range(len(classes)):
+            s, e = str(timestamps[i][0]), str(timestamps[i][1])
+            label = Main_classes[classes[i]]
+            label_index = str(classes[i])
+            fp_writer.writerow([id, s, e, label, label_index])
+        fp.close()
+        print('CSV file has been generated successfully!')
 
 
 if __name__ == '__main__':
-    wav_path = '../data/val/_7oWZq_s_Sk.wav'
+
+    dir_path = '../data/val/'
+    # wav_path = '../data/val/_7oWZq_s_Sk.wav'
+    Wav_Path = os.listdir(dir_path)
+
     val_feature_file = '../data/for_val/val.npy'
     saving = True
     frame_length = 320
 
-    # extraction
-    features = fill_and_extract(wav_path, frame_length=frame_length, method='sole', padding_mode='symmetric' ,saving=saving)
-    print(features.shape)
+    for wav_path in Wav_Path:
+        # extraction
+        features = fill_and_extract(wav_path, frame_length=frame_length, method='sole', padding_mode='symmetric', saving=saving)
+        print(wav_path, features.shape)
 
-    # evaluation
-    if saving:
-        features = torch.from_numpy(np.load(val_feature_file))
-    print(features.shape)
-    predicts = feature_evaluate(features)
-    print(predicts.shape)
+        # evaluation
+        if saving:
+            features = torch.from_numpy(np.load(val_feature_file))
+        print(wav_path, features.shape)
+        predicts = feature_evaluate(features)
+        print(wav_path, predicts.shape)
 
-    # fuse the labels and dump into a csv file
-    timestamps, classes = frame_fuse(predicts, frame_length=frame_length)
-    csv_generate(wav_path, timestamps, classes)
+        # fuse the labels and dump into a csv file
+        timestamps, classes = frame_fuse(predicts, frame_length=frame_length)
 
-    
+        if wav_path == Wav_Path[0]:
+            csv_generate(wav_path, timestamps, classes, True)
+        else:
+            csv_generate(wav_path, timestamps, classes, False)
+
+
     # visualize
     data_processor = data_preprocess.data_preprocess()
     validate_file = 'val_labels.csv'
