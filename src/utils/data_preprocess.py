@@ -336,7 +336,6 @@ class data_preprocess:
                 audio_name: audio need to be found
                 real_csv_path: the path of the real csv file, file name is needed only
                 predict_csv_path: the path of the predict csv file, file name is needed only
-                *** the predict_csv_path should include only one audio file's data ***
                 start: the beginning of the audio segment, with unit sec.
                 end: the ending of the audio segment, with unit sec.
 
