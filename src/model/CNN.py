@@ -3,7 +3,7 @@ import torch.nn as nn
 import torch.nn.functional as F
 import torch.optim as optim
 
-from model.CNN_dataset import *
+from CNN_dataset import *
 
 
 class CNN(nn.Module):
@@ -44,29 +44,33 @@ if __name__ == '__main__':
     criterion = torch.nn.CrossEntropyLoss().to(device)
     cnn = CNN(4).to(device)
     optimizer = optim.Adam(cnn.parameters(), lr=0.00018964, weight_decay=0.0000019156)
-    model_path = r'E:\projects\ruixinwei\2021rui\2021_ruixinwei_soundrecognition\saved_models\cnn.pkl'
-
-    # for epoch in range(50):
-    #     running_loss = 0.
-    #     for idx, data in enumerate(trainloader, 0):
-    #         inputs, labels = data[0].to(device), data[1].to(device)
-            
-    #         optimizer.zero_grad()
-            
-    #         outputs = cnn(inputs)
-    #         loss = criterion(outputs, labels)
-    #         loss.backward()
-    #         optimizer.step()
-    #         running_loss += loss.item()
-            
-    #         if idx % 100 == 99:
-    #             print('[epoch %d, batch_idx %d: loss %.3f'
-    #                  %(epoch, idx, running_loss/400))
-    #             running_loss = 0.
-
-    # torch.save(cnn.state_dict(), model_path)
+    model_path = '../saved_models/cnn.pkl'
 
     cnn.load_state_dict(torch.load(model_path))
+    trained = True
+
+    if not trained:
+        for epoch in range(50):
+            running_loss = 0.
+            for idx, data in enumerate(trainloader, 0):
+                inputs, labels = data[0].to(device), data[1].to(device)
+                
+                optimizer.zero_grad()
+                
+                outputs = cnn(inputs)
+                loss = criterion(outputs, labels)
+                loss.backward()
+                optimizer.step()
+                running_loss += loss.item()
+                
+                if idx % 100 == 99:
+                    print('[epoch %d, batch_idx %d: loss %.3f'
+                        %(epoch, idx, running_loss/400))
+                    running_loss = 0.
+
+        torch.save(cnn.state_dict(), model_path)
+
+    # cnn.load_state_dict(torch.load(model_path))
 
     correct = 0
     total = 0
@@ -75,7 +79,6 @@ if __name__ == '__main__':
             images, labels = data[0].to(device), data[1].to(device)
             outputs = cnn(images)
             _, predicted = torch.max(outputs.data, 1)
-            print(predicted.shape)
             total += labels.size(0)
             correct += (predicted == labels).sum().item()
 

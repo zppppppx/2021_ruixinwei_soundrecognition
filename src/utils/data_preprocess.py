@@ -328,46 +328,66 @@ class data_preprocess:
             if cnt % 2000 == 0:
                 print('{} pieces have been padded and {} are left'.format(cnt, total_num-cnt))
 
-    def data_visualize(self, audio_name, csv_path):
+    def data_visualize(self, audio_name, real_csv_path, predict_csv_path, start, end):
             """
             Visualize the data
 
             Args:
                 audio_name: audio need to be found
-                csv_path: the path of the real csv file, file name is needed only
+                real_csv_path: the path of the real csv file, file name is needed only
+                predict_csv_path: the path of the predict csv file, file name is needed only
+                *** the predict_csv_path should include only one audio file's data ***
+                start: the beginning of the audio segment, with unit sec.
+                end: the ending of the audio segment, with unit sec.
+
             """
-            csv_path = os.path.join(self.root_path, csv_path)
+            real_csv_path = os.path.join(self.root_path, real_csv_path)
+            real_raw_data = pd.read_csv(real_csv_path)
+            predict_csv_path = os.path.join(self.root_path, predict_csv_path)
+            predict_raw_data = pd.read_csv(predict_csv_path)
+
             (audio_name, _) = audio_name.split('.')
-            raw_data = pd.read_csv(csv_path)
-            audio_data = raw_data[raw_data['id'] == audio_name]
+            real_audio_data = real_raw_data[real_raw_data['id'] == audio_name]
+            predict_audio_data = predict_raw_data[predict_raw_data['id'] == audio_name]
+
             rate = 16000
-            analyse_start_time = int(input('输入开始时间：\n'))
-            analyse_end_time = int(input('输入结束时间：\n'))
+            analyse_start_time = int(start)
+            analyse_end_time = int(end)
             time = analyse_end_time - analyse_start_time
-            if audio_data.empty:
-                print('No such audio data!')
+            if real_audio_data.empty:
+                print('No such audio file!')
             else:
-                labels = list(audio_data['label'])
-                index = list(audio_data['label_index'])
+                real_index = list(real_audio_data['label_index'])
+                predict_index = list(predict_audio_data['label_index'])
                 index_dict = {
                     0: 1,
                     1: 1,
                     2: 1,
                     3: 0
                 }
-                thresh_index = [index_dict[x] if x in index_dict else x for x in index]
-                start_time = list(audio_data['s'])
-                end_time = list(audio_data['e'])
-                x_label = list(range(rate*time))
-                y_label = [0] * rate * time
+                real_thresh_index = [index_dict[x] if x in index_dict else x for x in real_index]
+                predict_thresh_index = [index_dict[x] if x in index_dict else x for x in predict_index]
+
+                start_time = list(real_audio_data['s'])
+                end_time = list(real_audio_data['e'])
+
+                x_label = list(np.arange(analyse_start_time, analyse_end_time, 1/rate))
+                real_y_label = [0] * rate * time
+                predict_y_label = [0] * rate * time
                 k = 0
                 for i in range(rate*analyse_start_time, rate*analyse_end_time):
-                    if start_time[k] <= float(i/rate) < end_time[k]:
-                        y_label[i] = thresh_index[k]
-                    elif k == len(thresh_index) - 1 and float(i/rate) >= end_time[k]:
+                    if k == len(real_thresh_index):
                         break
+                    if float(i / rate) < start_time[k]:
+                        continue
+                    elif start_time[k] <= float(i/rate) < end_time[k]:
+                        real_y_label[i] = real_thresh_index[k]
+                        predict_y_label[i] = predict_thresh_index[k]
                     else:
                         k += 1
                 plt.figure(figsize=(30, 10))
-                plt.plot(x_label, y_label)
+                plt.subplot(2, 1, 1)
+                plt.plot(x_label, real_y_label)
+                plt.subplot(2, 1, 2)
+                plt.plot(x_label, predict_y_label)
                 plt.show()
