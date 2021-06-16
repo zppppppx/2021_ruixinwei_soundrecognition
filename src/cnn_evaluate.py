@@ -8,7 +8,7 @@ from utils import data_preprocess
 import matplotlib.pyplot as plt
 import os
 
-def fill_and_extract(sound_file, frame_length=128, method='series', padding_mode='constant', saving=False):
+def fill_and_extract(sound_file, frame_length=128, method='series', padding_mode='constant', saving=False, save_path = r'..\data\for_val\val.npy'):
     """
     In order to mark a piece of audio file, we consider padding the audio file at the beginning
     and the end, each time we select a piece with length of frame_length*128 (here frame_length
@@ -63,7 +63,7 @@ def fill_and_extract(sound_file, frame_length=128, method='series', padding_mode
                 print('{} pieces have been processed and {} are left.'.format(i, tensor_number-i))
 
     if saving:
-        save_path = r'..\data\for_val\val.npy'
+        # save_path = r'..\data\for_val\val.npy'
         np.save(save_path, features.numpy())
 
     print('Feature extraction finished!')

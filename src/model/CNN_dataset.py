@@ -97,7 +97,7 @@ class data_resolute(object):
                 
 class MFCCDataset(Dataset):
     """
-    Dataset for training
+    Dataset for training CNN.
     """
     def __init__(self, root_path, feature_file, label_file, 
                 opt=data_resolute, train=True):
