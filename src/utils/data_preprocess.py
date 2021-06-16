@@ -328,22 +328,23 @@ class data_preprocess:
             if cnt % 2000 == 0:
                 print('{} pieces have been padded and {} are left'.format(cnt, total_num-cnt))
 
-    def data_visualize(self, audio_name, csv_path):
+    def data_visualize(self, audio_name, csv_path, start, end):
             """
             Visualize the data
 
             Args:
                 audio_name: audio need to be found
                 csv_path: the path of the real csv file, file name is needed only
+                start: the beginning of the audio segment, with unit sec.
+                end: the ending of the audio segment, with unit sec.
             """
             csv_path = os.path.join(self.root_path, csv_path)
             raw_data = pd.read_csv(csv_path)
             (audio_name, Extention) = audio_name.split('.')
-            raw_data = pd.read_csv(csv_path)
             audio_data = raw_data[raw_data['id'] == audio_name]
             rate = 16000
-            analyse_start_time = int(input('输入开始时间：\n'))
-            analyse_end_time = int(input('输入结束时间：\n'))
+            analyse_start_time = int(start)
+            analyse_end_time = int(end)
             time = analyse_end_time - analyse_start_time
             if audio_data.empty:
                 print('No such audio data!')

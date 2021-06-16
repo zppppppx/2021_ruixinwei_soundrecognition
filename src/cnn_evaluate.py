@@ -4,8 +4,10 @@ from torchaudio import transforms
 from model import CNN
 import numpy as np
 import csv
+from utils import data_preprocess
+import matplotlib.pyplot as plt
 
-def fill_and_extract(sound_file, frame_length=128, padding_mode='constant', saving=False):
+def fill_and_extract(sound_file, frame_length=128, method='series', padding_mode='constant', saving=False):
     """
     In order to mark a piece of audio file, we consider padding the audio file at the beginning
     and the end, each time we select a piece with length of frame_length*128 (here frame_length
@@ -14,6 +16,8 @@ def fill_and_extract(sound_file, frame_length=128, padding_mode='constant', savi
     Args:
         file_path: str, the audio file in need of extraction.
         frame_length: int, the smallest time span we want to classify.
+        method: different extraction methods, 'series' for grabing a series to extract features containing features
+            before and after the frame; 'sole' for grab a frame and padding it to demanded length.
         padding_mode: str, same as the np.pad, {'constant', 'symmetric', 'reflect'}
         saving: bool, denoting whether you want to save the file.
 
@@ -21,25 +25,41 @@ def fill_and_extract(sound_file, frame_length=128, padding_mode='constant', savi
         features: tensor, size is [feature_tensor_nums, channel=1, segment_length, 128 bands]
     """
     wav_data, sample_rate = torchaudio.load(sound_file)
-    print(wav_data.shape)
     tensor_number = int(len(wav_data[0])/frame_length) # denotes the number of feature tensors
 
-    head = 63*frame_length
-    tail = 64*frame_length
-
-    # fill the data in order to assure the length matches the number of frames
-    wav_data = torch.tensor(np.pad(wav_data[0], (head, tail), mode=padding_mode)) 
     features = torch.zeros((tensor_number, 1, 128, 128))
     timespan = int(127*frame_length/2)
     hop_length = int(frame_length/2)
-    for i in range(tensor_number):
-        start = int(i*frame_length)
-        mfcc = transforms.MFCC(n_mfcc=128, melkwargs={'n_mels':128, 'win_length':frame_length, 
-        'hop_length':hop_length, 'n_fft':1024})(wav_data[start:(start+timespan)])
-        features[i, 0, :, :] = mfcc.T
 
-        if i % 10000 == 0:
-            print('{} pieces have been processed and {} are left.'.format(i, tensor_number-i))
+    if method == 'series':
+        head = 63*hop_length
+        tail = 64*hop_length
+
+        # fill the data in order to assure the length matches the number of frames
+        wav_data = torch.tensor(np.pad(wav_data[0], (head, tail), mode=padding_mode)) 
+        
+        for i in range(tensor_number):
+            start = int(i*frame_length)
+            mfcc = transforms.MFCC(n_mfcc=128, melkwargs={'n_mels':128, 'win_length':frame_length, 
+            'hop_length':hop_length, 'n_fft':1024})(wav_data[start:(start+timespan)])
+            features[i, 0, :, :] = mfcc.T
+
+            if i % 10000 == 0:
+                print('{} pieces have been processed and {} are left.'.format(i, tensor_number-i))
+
+    elif method == 'sole':
+        for i in range(tensor_number):
+            head = 62*hop_length
+            tail = 63*hop_length
+            wav_piece = wav_data[0][i*frame_length:(i+1)*frame_length]
+            wav_for_val = torch.tensor(np.pad(wav_piece, (head, tail), mode='symmetric'))
+            mfcc = transforms.MFCC(n_mfcc=128, melkwargs={'n_mels':128, 'win_length':frame_length, 
+            'hop_length':hop_length, 'n_fft':1024})(wav_for_val)
+            
+            features[i, 0, :, :] = mfcc.T
+
+            if i % 10000 == 0:
+                print('{} pieces have been processed and {} are left.'.format(i, tensor_number-i))
 
     if saving:
         save_path = r'..\data\for_val\val.npy'
@@ -127,7 +147,7 @@ def frame_fuse(predicts, frame_length=128):
     return timestamps, classes
 
 
-def csv_generate(sound_file: str, timestamps: list, classes: list, csv_file='../data/for_val/output.csv'):
+def csv_generate(sound_file: str, timestamps: list, classes: list, csv_file='../data/for_val/val_pre.csv'):
     """
     Write the results into csvfiles.
 
@@ -159,8 +179,8 @@ if __name__ == '__main__':
     frame_length = 320
 
     # extraction
-    # features = fill_and_extract(wav_path, frame_length=frame_length, saving=saving)
-    # print(features.shape)
+    features = fill_and_extract(wav_path, frame_length=frame_length, method='sole', padding_mode='symmetric' ,saving=saving)
+    print(features.shape)
 
     # evaluation
     if saving:
@@ -172,3 +192,16 @@ if __name__ == '__main__':
     # fuse the labels and dump into a csv file
     timestamps, classes = frame_fuse(predicts, frame_length=frame_length)
     csv_generate(wav_path, timestamps, classes)
+
+    
+    # visualize
+    data_processor = data_preprocess.data_preprocess()
+    validate_file = 'val_labels.csv'
+    output_file = 'for_val/output.csv'
+    wav = '_7oWZq_s_Sk.wav'
+    start = 0
+    end = 60
+    fig1 = plt.figure(figsize=(30, 10))
+    data_processor.data_visualize(wav, validate_file, start, end)
+    fig2 = plt.figure(figsize=(30, 10))
+    data_processor.data_visualize(wav, output_file, start, end)
