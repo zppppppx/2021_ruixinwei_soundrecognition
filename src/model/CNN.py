@@ -3,7 +3,7 @@ import torch.nn as nn
 import torch.nn.functional as F
 import torch.optim as optim
 
-from CNN_dataset import *
+from model.CNN_dataset import *
 
 
 class CNN(nn.Module):

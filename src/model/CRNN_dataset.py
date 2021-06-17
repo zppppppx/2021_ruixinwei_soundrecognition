@@ -9,7 +9,7 @@ import os
 
 
 class crnn_dataset(Dataset):
-    def __init__(self, root_path='../data/', feature_file='../data/crnn_feature_train.npy', label_file='crnn_label_train.npy'):
+    def __init__(self, root_path='../data/', feature_file='../data/crnn_feature_train.npy', label_file='../data/crnn_label_train.npy'):
         self.root_path = root_path
         self.feature_file = feature_file
         self.label_file = label_file

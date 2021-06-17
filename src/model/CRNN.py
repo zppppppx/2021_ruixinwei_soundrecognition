@@ -6,13 +6,14 @@ import torch.nn.functional as F
 import torch.optim as optim
 from torch.utils.data import DataLoader
 from torchaudio import transforms
+import torchaudio
 import pandas as pd
 import numpy as np
 
 
 # from cnn_evaluate import fill_and_extract
-from CRNN_dataset import crnn_dataset
-from CNN import *
+from model.CRNN_dataset import crnn_dataset
+from model.CNN import *
 
 def fill_and_extract(sound_file, frame_length=128, method='series', padding_mode='constant', saving=False, save_path = r'..\data\for_val\val.npy'):
     """
@@ -32,7 +33,7 @@ def fill_and_extract(sound_file, frame_length=128, method='series', padding_mode
         features: tensor, size is [feature_tensor_nums, channel=1, segment_length, 128 bands]
     """
     wav_data, sample_rate = torchaudio.load(sound_file)
-    tensor_number = int(len(wav_data[0])/frame_length) # denotes the number of feature tensors
+    tensor_number = int(len(wav_data[0])/160) # denotes the number of feature tensors
 
     features = torch.zeros((tensor_number, 1, 128, 128))
     timespan = int(127*frame_length/2)
@@ -46,7 +47,7 @@ def fill_and_extract(sound_file, frame_length=128, method='series', padding_mode
         wav_data = torch.tensor(np.pad(wav_data[0], (head, tail), mode=padding_mode)) 
         
         for i in range(tensor_number):
-            start = int(i*frame_length)
+            start = i*160 #int(i*frame_length)
             mfcc = transforms.MFCC(n_mfcc=128, melkwargs={'n_mels':128, 'win_length':frame_length, 
             'hop_length':hop_length, 'n_fft':1024})(wav_data[start:(start+timespan)])
             features[i, 0, :, :] = mfcc.T
@@ -77,12 +78,14 @@ def fill_and_extract(sound_file, frame_length=128, method='series', padding_mode
     return features
 
 class CRNN(nn.Module):
-    def __init__(self, classnums, hidden_size=1024, num_layers=2):
+    def __init__(self, classnums, hidden_size=256, num_layers=4, bidirectional=True):
         super(CRNN, self).__init__()
         self.num_layers = num_layers
         self.hidden_size = hidden_size
+        self.bi = 2 if bidirectional else 1
 
         cnn = CNN(4)
+        model_cnn = '../saved_models/cnn.pkl'
         cnn.load_state_dict(torch.load(model_cnn))
         cnnlayers = list(cnn.children())
         self.Conv1 = cnnlayers[0]
@@ -94,13 +97,13 @@ class CRNN(nn.Module):
         self.Dropout3 = cnnlayers[8]
 
         cnn_layers = [self.Conv1, self.Conv2, self.Conv3, self.MP, self.Dropout1, self.Dropout2, self.Dropout3]
-        for layer in cnn_layers:
-            for layer_para in layer.parameters():
-                layer_para.requires_grad = False
+        # for layer in cnn_layers:
+        #     for layer_para in layer.parameters():
+        #         layer_para.requires_grad = False
 
         self.LSTM = nn.LSTM(input_size=128*32, hidden_size=self.hidden_size, 
                             num_layers=self.num_layers, batch_first=True, bidirectional=True)
-        self.FC1 = nn.Linear(8*self.num_layers*self.hidden_size, 64)
+        self.FC1 = nn.Linear(8*self.bi*self.hidden_size, 64)
         self.FC2 = nn.Linear(64, classnums)
 
     def forward(self, x: tensor):
@@ -111,27 +114,31 @@ class CRNN(nn.Module):
         x = F.relu(self.Conv3(x))
         x = self.Dropout3(x)
 
+        # print(x.shape)
         x = x.permute([0,2,1,3]).reshape((-1, 8, 128*32))
         x, (h, c) = self.LSTM(x)
 
-        x = x.view(-1, 8*self.num_layers*self.hidden_size)
+        # print(x.shape)
+        x = x.reshape((-1, 8*self.bi*self.hidden_size))
+        # print(x.shape)
         x = F.relu(self.FC1(x))
+        # print(x.shape)
         return self.FC2(x)
 
 if __name__ == '__main__':
-    cnn = CNN(4)
     # print(len(list(cnn.children())))
     root_path = '../data'
     model_cnn = '../saved_models/cnn.pkl'
     model_crnn = '../saved_models/crnn.pkl'
-    frame_length = 160
+    frame_length = 320
     feature_file = '../data/crnn_feature_train.npy'
     label_file='../data/crnn_label_train.npy'
+    batch_size = 128
 
     # Setting the network
     devices = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
     criterion = torch.nn.CrossEntropyLoss().to(devices)
-    crnn = CRNN(classnums=4).to(devices)
+    crnn = CRNN(classnums=2).to(devices)
     optimizer = optim.Adam([p for p in crnn.parameters() if p.requires_grad], lr=0.00018964, weight_decay=0.0000019156)
     
 
@@ -143,7 +150,7 @@ if __name__ == '__main__':
     # print(files)
     df = pd.read_csv(train_csv)
 
-    for epoch in range(10):
+    for outter_epoch in range(2):
         for i in range(len(files[:])):
             if os.path.exists(model_crnn):
                 crnn.load_state_dict(torch.load(model_crnn))
@@ -151,32 +158,43 @@ if __name__ == '__main__':
             sound_file = running_files[i]
             id = files[i].split('.')[0]
             labels = df['label_index'][df['id'] == id].values
-            labels = np.pad(labels, (1,1), mode='symmetric')
+            labels[labels<3] = 1
+            labels[labels==3] = 0
+            print(len(labels))
+            if len(labels) < 90000:
+                pad_head = int((90000-len(labels))/2)
+                pad_tail = 90000 - len(labels) - pad_head
+                labels = np.pad(labels, (pad_head,pad_tail), mode='symmetric')
+
+            if len(labels) > 90000:
+                start = int((len(labels)-90000)/2)
+                labels = labels[start:start+90000]
             print(len(labels))
             np.save(label_file, labels)
 
             fill_and_extract(sound_file, frame_length, 'series', 'symmetric', True, save_path=feature_file)
             crnn_data = crnn_dataset()
-            crnn_loader = DataLoader(dataset=crnn_data, batch_size=128, shuffle=True)
+            crnn_loader = DataLoader(dataset=crnn_data, batch_size=batch_size, shuffle=True)
 
-            running_loss = 0.
-            for idx, data in enumerate(crnn_loader, 0):
-                inputs, labels = data[0].to(devices), data[1].to(devices)
-                
-                optimizer.zero_grad()
-                
-                outputs = crnn(inputs)
-                loss = criterion(outputs, labels)
-                loss.backward()
-                optimizer.step()
-                running_loss += loss.item()
-                
-                if idx % 100 == 99:
-                    print('[epoch %d, batch_idx %d: loss %.3f'
-                        %(epoch, idx, running_loss/400))
-                    running_loss = 0.
+            for inner_epoch in range(2):
+                running_loss = 0.
+                for idx, data in enumerate(crnn_loader, 0):
+                    inputs, labels = data[0].to(devices), data[1].to(devices)
+                    
+                    optimizer.zero_grad()
+                    
+                    outputs = crnn(inputs)
+                    loss = criterion(outputs, labels)
+                    loss.backward()
+                    optimizer.step()
+                    running_loss += loss.item()
+                    
+                    if idx % 100 == 99:
+                        print('[outer_epoch %d, file num %d, inner_epoch %d, batch_idx %d: loss %.5f'
+                            %(outter_epoch, i, inner_epoch, idx, running_loss/100))
+                        running_loss = 0.
 
-            torch.save(cnn.state_dict(), model_crnn)
+            torch.save(crnn.state_dict(), model_crnn)
 
 
 
