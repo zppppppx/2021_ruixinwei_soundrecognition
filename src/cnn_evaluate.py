@@ -140,10 +140,10 @@ def frame_fuse(predicts, frame_length=128):
 
     if predicts[-2] == predicts[-1]:
         classes.append(int(predicts[-1]))
-        timestamps.append((start*timespan, (i+1)*timespan))
+        timestamps.append((start*timespan, (i+2)*timespan))
     else:
         classes.append(int(predicts[-1]))
-        timestamps.append((i*timespan, np.round((i+1)*timespan, 3)))
+        timestamps.append(((i+1)*timespan, np.round((i+2)*timespan, 3)))
 
     return timestamps, classes
 

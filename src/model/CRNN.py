@@ -35,7 +35,7 @@ def fill_and_extract(sound_file, frame_length=128, method='series', padding_mode
     wav_data, sample_rate = torchaudio.load(sound_file)
     tensor_number = int(len(wav_data[0])/160) # denotes the number of feature tensors
 
-    features = torch.zeros((tensor_number, 1, 128, 128))
+    features = torch.zeros((tensor_number, 1, 128, 40))
     timespan = int(127*frame_length/2)
     hop_length = int(frame_length/2)
 
@@ -48,8 +48,8 @@ def fill_and_extract(sound_file, frame_length=128, method='series', padding_mode
         
         for i in range(tensor_number):
             start = i*160 #int(i*frame_length)
-            mfcc = transforms.MFCC(n_mfcc=128, melkwargs={'n_mels':128, 'win_length':frame_length, 
-            'hop_length':hop_length, 'n_fft':1024})(wav_data[start:(start+timespan)])
+            mfcc = transforms.MFCC(n_mfcc=40, melkwargs={'n_mels':64, 'win_length':frame_length, 
+            'hop_length':hop_length, 'n_fft':128})(wav_data[start:(start+timespan)])
             features[i, 0, :, :] = mfcc.T
 
             if i % 10000 == 0:
@@ -61,8 +61,8 @@ def fill_and_extract(sound_file, frame_length=128, method='series', padding_mode
             tail = 63*hop_length
             wav_piece = wav_data[0][i*frame_length:(i+1)*frame_length]
             wav_for_val = torch.tensor(np.pad(wav_piece, (head, tail), mode='symmetric'))
-            mfcc = transforms.MFCC(n_mfcc=128, melkwargs={'n_mels':128, 'win_length':frame_length, 
-            'hop_length':hop_length, 'n_fft':1024})(wav_for_val)
+            mfcc = transforms.MFCC(n_mfcc=40, melkwargs={'n_mels':64, 'win_length':frame_length, 
+            'hop_length':hop_length, 'n_fft':128})(wav_for_val)
             
             features[i, 0, :, :] = mfcc.T
 
@@ -77,34 +77,76 @@ def fill_and_extract(sound_file, frame_length=128, method='series', padding_mode
 
     return features
 
-class CRNN(nn.Module):
-    def __init__(self, classnums, hidden_size=256, num_layers=4, bidirectional=True):
-        super(CRNN, self).__init__()
+# class CRNN(nn.Module):
+#     def __init__(self, classnums, hidden_size=256, num_layers=4, bidirectional=True):
+#         super(CRNN, self).__init__()
+#         self.num_layers = num_layers
+#         self.hidden_size = hidden_size
+#         self.bi = 2 if bidirectional else 1
+
+#         cnn = CNN(4)
+#         model_cnn = '../saved_models/cnn.pkl'
+#         cnn.load_state_dict(torch.load(model_cnn))
+#         cnnlayers = list(cnn.children())
+#         self.Conv1 = cnnlayers[0]
+#         self.Conv2 = cnnlayers[1]
+#         self.Conv3 = cnnlayers[2]
+#         self.MP = cnnlayers[5]
+#         self.Dropout1 = cnnlayers[6]
+#         self.Dropout2 = cnnlayers[7]
+#         self.Dropout3 = cnnlayers[8]
+
+#         cnn_layers = [self.Conv1, self.Conv2, self.Conv3, self.MP, self.Dropout1, self.Dropout2, self.Dropout3]
+#         # for layer in cnn_layers:
+#         #     for layer_para in layer.parameters():
+#         #         layer_para.requires_grad = False
+
+#         self.LSTM = nn.LSTM(input_size=128*32, hidden_size=self.hidden_size, 
+#                             num_layers=self.num_layers, batch_first=True, bidirectional=True)
+#         self.FC1 = nn.Linear(8*self.bi*self.hidden_size, 64)
+#         self.FC2 = nn.Linear(64, classnums)
+
+#     def forward(self, x: tensor):
+#         x = F.relu(self.Conv1(x))
+#         x = self.MP(self.Dropout1(x))
+#         x = F.relu(self.Conv2(x))
+#         x = self.MP(self.Dropout2(x))
+#         x = F.relu(self.Conv3(x))
+#         x = self.Dropout3(x)
+
+#         # print(x.shape)
+#         x = x.permute([0,2,1,3]).reshape((-1, 8, 128*32))
+#         x, (h, c) = self.LSTM(x)
+
+#         # print(x.shape)
+#         x = x.reshape((-1, 8*self.bi*self.hidden_size))
+#         # print(x.shape)
+#         x = F.relu(self.FC1(x))
+#         # print(x.shape)
+#         return self.FC2(x)
+
+
+class CRNN2(nn.Module):
+    def __init__(self, classnums, hidden_size=128, num_layers=4, bidirectional=True):
+        super(CRNN2, self).__init__()
         self.num_layers = num_layers
         self.hidden_size = hidden_size
         self.bi = 2 if bidirectional else 1
 
-        cnn = CNN(4)
-        model_cnn = '../saved_models/cnn.pkl'
-        cnn.load_state_dict(torch.load(model_cnn))
-        cnnlayers = list(cnn.children())
-        self.Conv1 = cnnlayers[0]
-        self.Conv2 = cnnlayers[1]
-        self.Conv3 = cnnlayers[2]
-        self.MP = cnnlayers[5]
-        self.Dropout1 = cnnlayers[6]
-        self.Dropout2 = cnnlayers[7]
-        self.Dropout3 = cnnlayers[8]
+        self.Conv1 = nn.Conv2d(in_channels=1, out_channels=16, kernel_size=5, padding=(2,2), padding_mode='reflect')
+        self.Conv2 = nn.Conv2d(in_channels=16, out_channels=32, kernel_size=3, padding=(1,1), padding_mode='reflect')
+        self.Conv3 = nn.Conv2d(in_channels=32, out_channels=64, kernel_size=5, padding=(2,2), padding_mode='reflect')
+        self.MP = nn.MaxPool2d(kernel_size=(4,2))
+        self.Dropout1 = nn.Dropout(0.2)
+        self.Dropout2 = nn.Dropout(0.3)
+        self.Dropout3 = nn.Dropout(0.35)
+        self.Dropout4 = nn.Dropout(0.2)
 
-        cnn_layers = [self.Conv1, self.Conv2, self.Conv3, self.MP, self.Dropout1, self.Dropout2, self.Dropout3]
-        # for layer in cnn_layers:
-        #     for layer_para in layer.parameters():
-        #         layer_para.requires_grad = False
-
-        self.LSTM = nn.LSTM(input_size=128*32, hidden_size=self.hidden_size, 
+        self.LSTM = nn.LSTM(input_size=64*10, hidden_size=self.hidden_size, 
                             num_layers=self.num_layers, batch_first=True, bidirectional=True)
         self.FC1 = nn.Linear(8*self.bi*self.hidden_size, 64)
-        self.FC2 = nn.Linear(64, classnums)
+        self.FC2 = nn.Linear(64, 32)
+        self.FC3 = nn.Linear(32, classnums)
 
     def forward(self, x: tensor):
         x = F.relu(self.Conv1(x))
@@ -115,7 +157,7 @@ class CRNN(nn.Module):
         x = self.Dropout3(x)
 
         # print(x.shape)
-        x = x.permute([0,2,1,3]).reshape((-1, 8, 128*32))
+        x = x.permute([0,2,1,3]).reshape((-1, 8, 10*64))
         x, (h, c) = self.LSTM(x)
 
         # print(x.shape)
@@ -123,14 +165,19 @@ class CRNN(nn.Module):
         # print(x.shape)
         x = F.relu(self.FC1(x))
         # print(x.shape)
-        return self.FC2(x)
+        x = F.relu(self.FC2(x))
+        # print(x.shape)
+        x = self.Dropout4(x)
+        # print(x.shape)
+        return self.FC3(x)
+
 
 if __name__ == '__main__':
     # print(len(list(cnn.children())))
     root_path = '../data'
     model_cnn = '../saved_models/cnn.pkl'
     model_crnn = '../saved_models/crnn.pkl'
-    frame_length = 320
+    frame_length = 80
     feature_file = '../data/crnn_feature_train.npy'
     label_file='../data/crnn_label_train.npy'
     batch_size = 128
@@ -138,7 +185,7 @@ if __name__ == '__main__':
     # Setting the network
     devices = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
     criterion = torch.nn.CrossEntropyLoss().to(devices)
-    crnn = CRNN(classnums=2).to(devices)
+    crnn = CRNN2(classnums=2).to(devices)
     optimizer = optim.Adam([p for p in crnn.parameters() if p.requires_grad], lr=0.00018964, weight_decay=0.0000019156)
     
 
@@ -176,7 +223,7 @@ if __name__ == '__main__':
             crnn_data = crnn_dataset()
             crnn_loader = DataLoader(dataset=crnn_data, batch_size=batch_size, shuffle=True)
 
-            for inner_epoch in range(2):
+            for inner_epoch in range(5):
                 running_loss = 0.
                 for idx, data in enumerate(crnn_loader, 0):
                     inputs, labels = data[0].to(devices), data[1].to(devices)
