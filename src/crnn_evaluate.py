@@ -1,4 +1,5 @@
 import torch
+from torch import tensor
 import torchaudio
 from torchaudio import transforms
 from model import CRNN
@@ -85,8 +86,8 @@ def feature_evaluate(features):
         predicts: tensor, labels for every frame.
     """
     device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
-    crnn = CRNN.CRNN(2).to(device)
-    model_path = '../saved_models/crnn.pkl'
+    crnn = CRNN.CRNN2(2).to(device)
+    model_path = '../saved_models/crnn_Conv128_40_mel40.pkl'
     crnn.load_state_dict(torch.load(model_path))
 
     batch_size = 64
@@ -109,6 +110,25 @@ def feature_evaluate(features):
 
     return predicts
 
+
+def smooth(predicts: 'tensor', box: int=3):
+    """
+    Smooth the results to generate a more continuous result.
+
+    Args:
+        predicts: tensor, predicted results by the network.
+        box: length of the box, 3 default.
+    
+    Returns:
+        smoothed_predicts: the results after being smoothed, the same length of input predicts.
+    """
+    padding = int(box/2)
+    for_smooth = np.pad(predicts.numpy(), (padding, padding), 'symmetric')
+    for i in range(len(predicts)):
+        piece = for_smooth[i:i+box]
+        predicts[i] = 1 if sum(piece) >= int(box/2)+1 else 0
+
+    return predicts
 
 def frame_fuse(predicts, frame_length=160):
     """
@@ -188,15 +208,15 @@ def csv_generate(sound_file: str, timestamps: list, classes: list, mode: bool, c
 
 if __name__ == '__main__':
 
-    dir_path = '../data/val/'
+    dir_path = 'E:/projects/ruixinwei/2021rui/test/'
     # wav_path = '../data/val/_7oWZq_s_Sk.wav'
     # wav_path = '../data/val/o4xQ-BEa3Ss.wav'
     Wav_Path = os.listdir(dir_path)
 
-    val_feature_file = '../data/for_val/val.npy'
+    val_feature_file = 'E:/projects/ruixinwei/2021rui/test.npy'
     saving = True
     frame_length = 128
-    csv_file = '../data/for_val/val_pre.csv'
+    csv_file = 'E:/projects/ruixinwei/2021rui/val_pre.csv'
 
     if os.path.exists(csv_file):
         os.remove(csv_file)
@@ -204,14 +224,15 @@ if __name__ == '__main__':
     for i in range(len(Wav_Path)):
         wav_path = dir_path + Wav_Path[i]
         # extraction
-        features = fill_and_extract(wav_path, frame_length=frame_length, method='series', padding_mode='symmetric', saving=saving)
+        features = fill_and_extract(wav_path, frame_length=frame_length, method='series', padding_mode='symmetric', saving=saving, save_path=val_feature_file)
         print(wav_path, features.shape)
 
         # evaluation
         if saving:
             features = torch.from_numpy(np.load(val_feature_file))
         print(wav_path, features.shape)
-        predicts = feature_evaluate(features)
+        predicts = feature_evaluate(features).cpu()
+        predicts = smooth(predicts, 5)
         predicts[predicts == 0] = 3
 
         print(wav_path, predicts.shape)
@@ -225,13 +246,13 @@ if __name__ == '__main__':
 
 
 
-    # visualize
-    data_processor = data_preprocess.data_preprocess()
-    validate_file = 'val_labels.csv'
-    output_file = 'for_val/val_pre.csv'
-    wav = '_7oWZq_s_Sk.wav'
-    # wav = 'o4xQ-BEa3Ss.wav'
-    start = 0
-    end = 120
+    # # visualize
+    # data_processor = data_preprocess.data_preprocess()
+    # validate_file = 'val_labels.csv'
+    # output_file = 'for_val/val_pre.csv'
+    # wav = '_7oWZq_s_Sk.wav'
+    # # wav = 'o4xQ-BEa3Ss.wav'
+    # start = 0
+    # end = 120
 
-    data_processor.data_visualize(wav, validate_file, output_file,  start, end)
+    # data_processor.data_visualize(wav, validate_file, output_file,  start, end)
