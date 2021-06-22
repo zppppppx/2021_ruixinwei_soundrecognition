@@ -5,7 +5,7 @@ import torch.nn as nn
 import torch.nn.functional as F
 import torch.optim as optim
 from torch.optim import optimizer
-from torch.utils.data import DataLoader, Dataset, dataset
+from torch.utils.data import DataLoader, Dataset
 
 import torchaudio
 import pandas as pd
@@ -13,6 +13,121 @@ import numpy as np
 
 
 
+'''class CLDNN(nn.Module):
+    def __init__(self, mels=84, foresee: int=10, lookback: int=10):
+        """
+        Args:
+            mels: the number of mels we want to train to get.
+            foresee: how long we want to foresee.
+            lookback: how long we want to look back.
+        """
+        super(CLDNN, self).__init__()
+        self.mels = mels
+        self.foresee = foresee
+        self.lookback = lookback
+        self.length = foresee + lookback + 1
+        self.device = 'cuda:0' if torch.cuda.is_available() else 'cpu'
+
+        # BatchNorm
+        self.bn1 = nn.BatchNorm1d(1)
+        self.bn2 = nn.BatchNorm1d(1)
+        self.bn3 = nn.BatchNorm1d(1)
+
+        # Time convolution
+        self.Conv1 = nn.Conv1d(1, mels, 160)
+        self.MP1 = nn.MaxPool1d(161)
+
+        #  Frequency convolution
+        self.Conv2 = nn.Conv2d(1, 64, (1, 13))
+        self.MP2 = nn.MaxPool2d((1,6))
+
+        # LSTM
+        self.LSTM1 = nn.LSTM(input_size=64*12, hidden_size=128, num_layers=3,
+                            batch_first=True, bidirectional=True)
+
+        self.LSTM2 = nn.LSTM(input_size=320, hidden_size=128, num_layers=2,
+                            batch_first=True, bidirectional=True)
+
+        # DNN
+        self.fc1 = nn.Linear(21*128*2*2, 512)
+        self.fc2 = nn.Linear(512, 32)
+        self.fc3 = nn. Linear(32, 2)
+
+        self.fc4 = nn.Linear(112, 32)
+        self.fc5 = nn. Linear(32, 2)
+
+        # Last Conv1d
+        self.Conv3 = nn.Conv1d(2, 8, 128, 128, 64)
+        self.MP3 = nn.MaxPool1d(3)
+
+        # Dropout
+        self.Dropout1 = nn.Dropout(0.2)
+        self.Dropout2 = nn.Dropout(0.35)
+
+    def forward(self, inputs):
+        time_inputs = self.bn1(inputs)
+        freq_inputs = inputs
+        time_inputs = time_inputs.reshape(-1, 21, 320)
+
+
+        # extract freq feature and 
+        batchsize = inputs.shape[0]
+        # print(batchsize)
+        freq = torch.zeros((batchsize, self.length, self.mels)).to(self.device)
+
+        for i in range(self.length):
+            # print(inputs.shape)
+            x_temp = freq_inputs.reshape((batchsize, 1, self.length, 320))
+            x = x_temp[:, 0, i, :].reshape(batchsize, 1, -1)
+            # print(x.shape)
+            x = self.Conv1(x)
+            # print(x.shape)
+            x = self.MP1(x)
+            x = F.relu(x)
+            # print('x=', x)
+            x = torch.log(x+0.00001)
+            x = x.reshape(-1, self.mels)
+            freq[:, i, :] = x
+
+        freq = freq[:,None, :]
+        
+        # Frequency robustion
+        x = self.Conv2(freq)
+        x = self.MP2(x)
+
+        # Relationship between before and after
+        x = x.permute([0,2,1,3]).reshape((-1, 21, 64*12))
+        x, (h, c) = self.LSTM1(x)
+        # x = x.reshape(batchsize, 1, -1)
+        # x = self.bn2(x)
+        x = x.reshape(batchsize, -1)
+
+        # print(x.shape)
+
+        # Time feature
+        time, (h, c) = self.LSTM2(time_inputs)
+        # time = time.reshape(batchsize, 1, -1)
+        # time = self.bn3(time)
+        time = time.reshape(batchsize, -1)
+
+        # two_feature = torch.cat((x, time), dim=1)
+        two_feature = torch.cat((x[:, None, :], time[:, None, :]), dim=1)
+        # print(two_feature.shape)
+
+        # Conv1d
+        out = self.Conv3(two_feature)
+        out = self.MP3(out)
+        out = out.reshape((-1, 112))
+
+        # DNN
+        x = self.fc4(out)
+        x = self.Dropout1(F.relu(x))
+        # x = self.fc2(x)
+        # x = self.Dropout2(F.relu(x))
+
+        return self.fc5(x)
+
+'''
 class CLDNN(nn.Module):
     def __init__(self, mels=84, foresee: int=10, lookback: int=10):
         """
@@ -28,42 +143,57 @@ class CLDNN(nn.Module):
         self.length = foresee + lookback + 1
         self.device = 'cuda:0' if torch.cuda.is_available() else 'cpu'
 
+        # BatchNorm
+        self.bn1 = nn.BatchNorm1d(1)
+        self.bn2 = nn.BatchNorm1d(1)
+        self.bn3 = nn.BatchNorm1d(1)
+
         # Time convolution
         self.Conv1 = nn.Conv1d(1, mels, 160)
         self.MP1 = nn.MaxPool1d(161)
 
         #  Frequency convolution
-        self.Conv2 = nn.Conv2d(1, 64, (7, 13))
-        self.MP2 = nn.MaxPool2d((3,6))
+        self.Conv2 = nn.Conv2d(1, 64, (1, 13))
+        self.MP2 = nn.MaxPool2d((1,6))
 
         # LSTM
-        self.LSTM = nn.LSTM(input_size=64*12, hidden_size=128, num_layers=2,
+        self.LSTM1 = nn.LSTM(input_size=64*12, hidden_size=128, num_layers=3,
+                            batch_first=True, bidirectional=True)
+
+        self.LSTM2 = nn.LSTM(input_size=320, hidden_size=128, num_layers=2,
                             batch_first=True, bidirectional=True)
 
         # DNN
-        self.fc1 = nn.Linear(5*128*2, 256)
-        self.fc2 = nn.Linear(256, 32)
-        self.fc3 = nn.Linear(32, 4)
+        self.fc1 = nn.Linear(21*128*2*2, 512)
+        self.fc2 = nn.Linear(512, 32)
+        self.fc3 = nn. Linear(32, 2)
 
         # Dropout
         self.Dropout1 = nn.Dropout(0.2)
         self.Dropout2 = nn.Dropout(0.35)
 
     def forward(self, inputs):
-        # extract freq feature
+        time_inputs = self.bn1(inputs)
+        freq_inputs = inputs
+        time_inputs = time_inputs.reshape(-1, 21, 320)
+
+
+        # extract freq feature and 
         batchsize = inputs.shape[0]
+        # print(batchsize)
         freq = torch.zeros((batchsize, self.length, self.mels)).to(self.device)
 
         for i in range(self.length):
             # print(inputs.shape)
-            x_temp = inputs.reshape((batchsize, 1, self.length, 320))
+            x_temp = freq_inputs.reshape((batchsize, 1, self.length, 320))
             x = x_temp[:, 0, i, :].reshape(batchsize, 1, -1)
             # print(x.shape)
             x = self.Conv1(x)
             # print(x.shape)
             x = self.MP1(x)
             x = F.relu(x)
-            x = torch.log(x+0.05)
+            # print('x=', x)
+            x = torch.log(x+0.0001)
             x = x.reshape(-1, self.mels)
             freq[:, i, :] = x
 
@@ -74,13 +204,25 @@ class CLDNN(nn.Module):
         x = self.MP2(x)
 
         # Relationship between before and after
-        x = x.permute([0,2,1,3]).reshape((-1, 5, 64*12))
-        x, (h, c) = self.LSTM(x)
+        x = x.permute([0,2,1,3]).reshape((-1, 21, 64*12))
+        x, (h, c) = self.LSTM1(x)
+        # x = x.reshape(batchsize, 1, -1)
+        # x = self.bn2(x)
         x = x.reshape(batchsize, -1)
+
         # print(x.shape)
 
+        # Time feature
+        time, (h, c) = self.LSTM2(time_inputs)
+        # time = time.reshape(batchsize, 1, -1)
+        # time = self.bn3(time)
+        time = time.reshape(batchsize, -1)
+
+        two_feature = torch.cat((x, time), dim=1)
+        # print(two_feature.shape)
+
         # DNN
-        x = self.fc1(x)
+        x = self.fc1(two_feature)
         x = self.Dropout1(F.relu(x))
         x = self.fc2(x)
         x = self.Dropout2(F.relu(x))
@@ -108,10 +250,19 @@ class raw_data(Dataset):
         df = pd.read_csv(self.label_file)
         df = df['label_index'][df['id'] == self.wav_name]
         index = df.values[20:20+89959]
-        index[index == 3] = 0
-        index[index < 3] = 1
 
-        return frags, torch.tensor(index).long()
+        # index0_2 = index[index < 3]
+        # index3 = index[index == 3][:len(index0_2)]
+        # # print(index3[:10], index0_2[:10])
+        # frags3 = frags[index == 3][:len(index0_2)]
+        # frags0_2 = frags[index < 3]
+        # # print(len(index3), len(index0_2))
+        # frags = np.concatenate((frags3, frags0_2))
+        # index = np.concatenate((index3, index0_2))
+        index[index<3] = 1
+        index[index==3] = 0
+
+        return torch.tensor(frags).float(), torch.tensor(index).long()
 
     def __getitem__(self, index):
         return self.data[index], self.labels[index]
@@ -123,11 +274,12 @@ class raw_data(Dataset):
 if __name__ == '__main__':
     # setting basic parameters
     train_path = '../data/train'
-    model_cldnn = '../saved_models/cldnn.pkl'
+    model_cldnn = '../saved_models/cldnn5.pkl'
     files = os.listdir(train_path)
-    batch_size = 1024
+    batch_size = 256
 
-    wav_val = '_7oWZq_s_Sk.wav'
+    wav_val = 'J1jDc2rTJlg.wav'
+
 
     # set up the network
     devices = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
@@ -138,14 +290,14 @@ if __name__ == '__main__':
 
     for outer_epoch in range(2):
         i = 0
-        for wav_path in files:
-            if os.path.exists(model_cldnn):
+        for wav_path in files[25:30]:
+            if os.path.exists(model_cldnn): 
                 cldnn.load_state_dict(torch.load(model_cldnn))
             raw_dataset = raw_data(wav_path)
             raw_loader = DataLoader(dataset=raw_dataset, batch_size=batch_size, shuffle=True)
 
             # Training
-            for inner_epoch in range(2):
+            for inner_epoch in range(4):
                 running_loss = 0.
                 for idx, data in enumerate(raw_loader, 0):
                     inputs, labels = data[0].to(devices), data[1].to(devices)
@@ -164,8 +316,11 @@ if __name__ == '__main__':
                         running_loss = 0.
 
             torch.save(cldnn.state_dict(), model_cldnn)
-
             i += 1
+
+    # cldnn = CLDNN().to(devices)
+    # cldnn.load_state_dict(torch.load(model_cldnn))
+    
 
             valdata = raw_data(wav_val, label_file='../data/val_piece.csv', root_path='../data/val/')
             valloader = DataLoader(dataset=valdata, batch_size=batch_size)
@@ -174,6 +329,9 @@ if __name__ == '__main__':
             with torch.no_grad():
                 for data in valloader:
                     inputs, labels = data[0].to(devices), data[1].to(devices)
+                    # print(labels[labels==1].shape)
+                    # print(labels[labels==0].shape)
+                    # print(labels)
                     outputs = cldnn(inputs)
                     _, predicted = torch.max(outputs.data, 1)
                     total += labels.size(0)
