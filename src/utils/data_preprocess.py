@@ -329,64 +329,83 @@ class data_preprocess:
                 print('{} pieces have been padded and {} are left'.format(cnt, total_num-cnt))
 
     def data_visualize(self, audio_name, real_csv_path, predict_csv_path, start, end):
-            """
-            Visualize the data
+        """
+        Visualize the data
 
-            Args:
-                audio_name: audio need to be found
-                real_csv_path: the path of the real csv file, file name is needed only
-                predict_csv_path: the path of the predict csv file, file name is needed only
-                start: the beginning of the audio segment, with unit sec.
-                end: the ending of the audio segment, with unit sec.
+        Args:
+            audio_name: audio need to be found
+            real_csv_path: the path of the real csv file, file name is needed only
+            predict_csv_path: the path of the predict csv file, file name is needed only
+            start: the beginning of the audio segment, with unit sec.
+            end: the ending of the audio segment, with unit sec.
 
-            """
-            real_csv_path = os.path.join(self.root_path, real_csv_path)
-            real_raw_data = pd.read_csv(real_csv_path)
-            predict_csv_path = os.path.join(self.root_path, predict_csv_path)
-            predict_raw_data = pd.read_csv(predict_csv_path)
+            the real csv's format and the predict one's are NOT match !!!
+            the real one's: id, s, e, label, index
+            the predict one's: id, s, e
 
-            (audio_name, _) = audio_name.split('.')
-            real_audio_data = real_raw_data[real_raw_data['id'] == audio_name]
-            predict_audio_data = predict_raw_data[predict_raw_data['id'] == audio_name]
+        """
+        real_csv_path = os.path.join(self.root_path, real_csv_path)
+        real_raw_data = pd.read_csv(real_csv_path)
+        predict_csv_path = os.path.join(self.root_path, predict_csv_path)
+        predict_raw_data = pd.read_csv(predict_csv_path)
 
-            rate = 16000
-            analyse_start_time = int(start)
-            analyse_end_time = int(end)
-            time = analyse_end_time - analyse_start_time
-            if real_audio_data.empty:
-                print('No such audio file!')
-            else:
-                real_index = list(real_audio_data['label_index'])
-                predict_index = list(predict_audio_data['label_index'])
-                index_dict = {
-                    0: 1,
-                    1: 1,
-                    2: 1,
-                    3: 0
-                }
-                real_thresh_index = [index_dict[x] if x in index_dict else x for x in real_index]
-                predict_thresh_index = [index_dict[x] if x in index_dict else x for x in predict_index]
+        (audio_name, _) = audio_name.split('.')
+        real_audio_data = real_raw_data[real_raw_data['id'] == audio_name]
+        predict_audio_data = predict_raw_data[predict_raw_data['id'] == audio_name]
 
-                start_time = list(real_audio_data['s'])
-                end_time = list(real_audio_data['e'])
+        rate = 16000
+        analyse_start_time = int(start)
+        analyse_end_time = int(end)
+        time = analyse_end_time - analyse_start_time
+        if real_audio_data.empty:
+            print('No such audio file!')
+        else:
+            real_index = list(real_audio_data['label_index'])
+            #predict_index = list(predict_audio_data['label_index'])
 
-                x_label = list(np.arange(analyse_start_time, analyse_end_time, 1/rate))
-                real_y_label = [0] * rate * time
-                predict_y_label = [0] * rate * time
-                k = 0
-                for i in range(rate*analyse_start_time, rate*analyse_end_time):
-                    if k == len(real_thresh_index):
-                        break
-                    if float(i / rate) < start_time[k]:
-                        continue
-                    elif start_time[k] <= float(i/rate) < end_time[k]:
-                        real_y_label[i] = real_thresh_index[k]
-                        predict_y_label[i] = predict_thresh_index[k]
-                    else:
-                        k += 1
-                plt.figure(figsize=(30, 10))
-                plt.subplot(2, 1, 1)
-                plt.plot(x_label, real_y_label)
-                plt.subplot(2, 1, 2)
-                plt.plot(x_label, predict_y_label)
-                plt.show()
+            index_dict = {
+                0: 1,
+                1: 1,
+                2: 1,
+                3: 0
+            }
+            real_thresh_index = [index_dict[x] if x in index_dict else x for x in real_index]
+            #predict_thresh_index = [index_dict[x] if x in index_dict else x for x in predict_index]
+
+            real_start_time = list(real_audio_data['s'])
+            real_end_time = list(real_audio_data['e'])
+
+            predict_start_time = list(predict_audio_data['s'])
+            predict_end_time = list(predict_audio_data['e'])
+
+            x_label = list(np.arange(analyse_start_time, analyse_end_time, 1/rate))
+            real_y_label = [0] * rate * time
+            predict_y_label = [0] * rate * time
+            k = 0
+            for i in range(rate*analyse_start_time, rate*analyse_end_time):
+                if k == len(real_thresh_index):
+                    break
+                if float(i/rate) < real_start_time[k]:
+                    continue
+                elif real_start_time[k] <= float(i/rate) < real_end_time[k]:
+                    real_y_label[i] = real_thresh_index[k]
+                    #predict_y_label[i] = predict_thresh_index[k]
+                else:
+                    k += 1
+            k = 0
+            for i in range(rate*analyse_start_time, rate*analyse_end_time):
+                if k == len(real_thresh_index):
+                    break
+                if float(i/rate) < predict_start_time[k]:
+                    continue
+                elif predict_start_time[k] <= float(i/rate) < predict_end_time[k]:
+                    predict_y_label[i] = 1
+                else:
+                    k += 1
+
+            plt.figure(figsize=(30, 10))
+            plt.subplot(2, 1, 1)
+            plt.plot(x_label, real_y_label)
+            plt.subplot(2, 1, 2)
+            plt.plot(x_label, predict_y_label)
+            plt.show()
