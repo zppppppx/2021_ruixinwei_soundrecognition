@@ -388,7 +388,7 @@ class data_preprocess:
                 if float(i/rate) < real_start_time[k]:
                     continue
                 elif real_start_time[k] <= float(i/rate) < real_end_time[k]:
-                    real_y_label[i] = real_thresh_index[k]
+                    real_y_label[i-rate*analyse_start_time] = real_thresh_index[k]
                     #predict_y_label[i] = predict_thresh_index[k]
                 else:
                     k += 1
@@ -399,7 +399,7 @@ class data_preprocess:
                 if float(i/rate) < predict_start_time[k]:
                     continue
                 elif predict_start_time[k] <= float(i/rate) < predict_end_time[k]:
-                    predict_y_label[i] = 1
+                    predict_y_label[i-rate*analyse_start_time] = 1
                 else:
                     k += 1
 
