@@ -5,12 +5,12 @@ import numpy as np
 import csv
 from utils import data_preprocess
 # from model.CLDNN_mel import CLDNN_mel
-from model.CLDNN_mel_shorter_time import CLDNN_mel
+from model.CLDNN_longer_120_withenc import CLDNN_mel
 import matplotlib.pyplot as plt
 import os
 from utils.filter import filter
 
-def fill_cut(wav_file: str):
+def fill_cut_eval(wav_file: str, model: str):
     """
     In order to evaluate the file, we need to pad the audio file to a suitable length, which 
     is compatible of audio_length/frame_length
@@ -24,107 +24,63 @@ def fill_cut(wav_file: str):
     """
     waveform, sr = torchaudio.load(wav_file)
     waveform = waveform[0].numpy()
-    padded_waveform = np.pad(waveform, (10*320, 10*320 + 160), mode='symmetric')
+    padded_waveform = np.pad(waveform, (30*320, 30*320 + 160), mode='symmetric')
 
-    frags = np.zeros((90000, 1, 320*21))
-    for i in range(90000):
-        frags[i, 0] = padded_waveform[i*160:i*160+320*21]
-    
-    return torch.tensor(frags).float()
-
-# def evaluate(frags, model:str):
-#     """
-#     Evaluate the input frags and return the predicted classes.
-
-#     Args:
-#         frags: tensor, used for input into the network.
-#         model: the model we need to evaluate the inputs.
-
-#     Returns
-#         predicts: tensor, predicted results.
-#     """
-#     batch_size = 512
-#     device = 'cuda:0' if torch.cuda.is_available() else "cpu"
-#     cldnn = CLDNN_mel().to(device)
-#     cldnn.load_state_dict(torch.load(model))
-
-#     epoch = int(frags.shape[0]/batch_size)
-#     left = int(frags.shape[0] - epoch*batch_size)
-
-#     predicts = torch.tensor([]).long().to(device)
-#     with torch.no_grad():
-#         for i in range(epoch):
-#             frag = frags[i*batch_size:(i+1)*batch_size].to(device)
-#             output = cldnn(frag)
-#             _, predicted = torch.max(output.data, 1)
-#             predicts = torch.cat((predicts, predicted))
-        
-#         if left != 0 :
-#             frag = frags[(i+1)*batch_size:(i+1)*batch_size+left].to(device)
-#             output = cldnn(frag)
-#             _, predicted = torch.max(output.data, 1)
-#             predicts = torch.cat((predicts, predicted))
-
-#     return predicts
-
-def evaluate(frags, model:str):
-    """
-    Evaluate the input frags and return the predicted classes.
-
-    Args:
-        frags: tensor, used for input into the network.
-        model: the model we need to evaluate the inputs.
-
-    Returns
-        predicts: tensor, predicted results.
-    """
-    batch_size = 512
     device = 'cuda:0' if torch.cuda.is_available() else "cpu"
     cldnn = CLDNN_mel().to(device)
     cldnn.load_state_dict(torch.load(model))
 
-    epoch = int(frags.shape[0]/batch_size)
-    left = int(frags.shape[0] - epoch*batch_size)
+    batch_size = 512
+    epoch = int(90000/batch_size)
+    left = int(90000 - epoch*batch_size)
 
-    proba = torch.tensor([]).long().to(device)
+    proba = torch.tensor([]).float()
     with torch.no_grad():
         for i in range(epoch):
-            frag = frags[i*batch_size:(i+1)*batch_size].to(device)
-            output = cldnn(frag)[:, 1]
-            # _, predicted = torch.max(output.data, 1)
+            frags = torch.zeros(batch_size, 1, 320*61)
+            start = i*batch_size
+            for j in range(batch_size):
+                frags[j,0,:] = torch.tensor(padded_waveform[(start+j)*160:(start+j)*160+320*61])
+            frags = frags.to(device)
+            output = cldnn(frags)[:, 1].to("cpu")
+            frags = None
             proba = torch.cat((proba, output))
+            output = None
+
+            # print('Epoch:  %d' % i)
         
-        if left != 0 :
-            frag = frags[(i+1)*batch_size:(i+1)*batch_size+left].to(device)
-            output = cldnn(frag)[:, 1]
-            # _, predicted = torch.max(output.data, 1)
+        if left != 0:
+            frags = torch.zeros(left, 1, 320*61)
+            start = epoch*batch_size
+            for j in range(left):
+                frags[j,0,:] = torch.tensor(padded_waveform[(start+j)*160:(start+j)*160+320*61])
+            frags = frags.to(device)
+            output = cldnn(frags)[:, 1].to("cpu")
+            frags = None
             proba = torch.cat((proba, output))
+            output = None
+
+            
+        # for i in range(90000):
+        #     # print(i)
+        #     frags = torch.zeros(1,1,320*31)
+        #     frags[0,0,:] = torch.from_numpy(padded_waveform[i*160:i*160+320*31])
+        #     frags = frags.float().to(device)
+        #     output = cldnn(frags)[:, 1].to("cpu")
+        #     frags = None
+        #         # _, predicted = torch.max(output.data, 1)
+        #     proba = torch.cat((proba, output))
+        #     output = None
+        #     if i % 10000 == 9999:
+        #         print(i)
 
     proba = filter(proba.to("cpu").numpy(), 101, method='mean')
     proba[proba > 0.5] = 1
     proba[proba <= 0.5] = 0
-
+    
     return proba
 
 
-def smooth(predicts: 'tensor', box: int=3):
-    """
-    Smooth the results to generate a more continuous result.
-
-    Args:
-        predicts: tensor, predicted results by the network.
-        box: length of the box, 3 default.
-    
-    Returns:
-        smoothed_predicts: the results after being smoothed, the same length of input predicts.
-    """
-    padding = int(box/2)
-    for_smooth = np.pad(predicts.cpu().numpy(), (padding, padding), 'symmetric')
-    for i in range(len(predicts)):
-        piece = for_smooth[i:i+box]
-        predicts[i] = 1 if sum(piece) >= int(box/2)+1 else 0
-
-    return predicts
 
 def frame_fuse(predicts, frame_length=160):
     """
@@ -213,7 +169,7 @@ if __name__ == '__main__':
 
     # set up the network
     device = 'cuda:0' if torch.cuda.is_available() else "cpu"
-    model_cldnn = '../saved_models/cldnn_mel_log2_d.pkl'
+    model_cldnn = '../saved_models/cldnn_mel_longer_120_with_enc.pkl'
     
 
 
@@ -224,13 +180,8 @@ if __name__ == '__main__':
     for i in range(len(Wav_Path)):
         wav_file = dir_path + Wav_Path[i]
         # Evaluation
-        frags = fill_cut(wav_file)
-        # print(frags.shape)
-        predicts = evaluate(frags, model_cldnn)
-        frags = None
-        # predicts[predicts<3] = 1
-        # predicts[predicts==3] = 0
-        # predicts = smooth(predicts, 111)
+        predicts = fill_cut_eval(wav_file, model_cldnn)
+
         predicts[predicts == 0] = 3
 
         timestamps, classes = frame_fuse(predicts)
@@ -240,6 +191,7 @@ if __name__ == '__main__':
         # print(classes, timestamps)
         mode = True if i == 0 else False
         csv_generate(wav_file, timestamps, classes, mode, csv_file)
+        predicts, timestamps, classes = None, None, None
 
         print('The {}th audio file has been evaluated! And {} are left'.format(i+1, len(Wav_Path)-i-1))
     

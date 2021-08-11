@@ -129,6 +129,7 @@ import random
         return self.fc5(x)
 
 '''
+
 class CLDNN_mel(nn.Module):
     def __init__(self, mels=84, foresee: int=10, lookback: int=10):
         """
@@ -155,17 +156,17 @@ class CLDNN_mel(nn.Module):
 
         #  Frequency convolution
         self.Conv2 = nn.Conv2d(32, 128, 5)
-        self.MP2 = nn.MaxPool2d((2,2))
+        # self.MP2 = nn.MaxPool2d((2,2))
 
         # LSTM
-        self.LSTM1 = nn.LSTM(input_size=128*6, hidden_size=128, num_layers=3,
-                            batch_first=True, bidirectional=True)
+        self.LSTM1 = nn.LSTM(input_size=128*14, hidden_size=128, num_layers=3,
+                            batch_first=True, bidirectional=True) # Frequency
 
         self.LSTM2 = nn.LSTM(input_size=320, hidden_size=128, num_layers=2,
-                            batch_first=True, bidirectional=True)
+                            batch_first=True, bidirectional=True) # Time
 
         # DNN
-        self.fc1 = nn.Linear(21*128*2+6*128*2, 512)
+        self.fc1 = nn.Linear(21*128*2+14*128*2, 512)
         self.fc2 = nn.Linear(512, 32)
         self.fc3 = nn. Linear(32, 2)
 
@@ -188,13 +189,14 @@ class CLDNN_mel(nn.Module):
         
         # Frequency Conv
         x = self.Conv1(freq)
+        x = F.relu(x)
         x = self.Dropout0(x)
-        x = self.MP1(x)
+        # x = self.MP1(x)
         x = self.Conv2(x)
-        x = self.MP2(x)
+        x = self.MP1(x)
 
         # Relationship between before and after
-        x = x.permute([0,3,1,2]).reshape((batchsize, 6, -1))
+        x = x.permute([0,3,1,2]).reshape((batchsize, 14, -1))
         x, (h, c) = self.LSTM1(x)
         # x = x.reshape(batchsize, 1, -1)
         # x = self.bn2(x)
@@ -219,7 +221,7 @@ class CLDNN_mel(nn.Module):
         x = F.relu(x)
         x = F.softmax(x, dim=1)
 
-        return self.fc3(x)
+        return F.softmax(self.fc3(x), dim=1)
 
 
 class raw_data(Dataset):
@@ -279,11 +281,13 @@ class raw_data(Dataset):
 if __name__ == '__main__':
     # setting basic parameters
     train_path = '../data/train'
-    model_cldnn = '../saved_models/cldnn_mel_log2.pkl'
+    val_path = '../data/val'
+    model_cldnn = '../saved_models/cldnn_mel_log2_s.pkl'
     files = os.listdir(train_path)
-    batch_size = 512
+    batch_size = 128
 
-    wav_val = ['J1jDc2rTJlg.wav']
+
+    wav_val = os.listdir(val_path) #['J1jDc2rTJlg.wav','Kb1fduj-jdY.wav','t1LXrJOvPDg.wav', 'yMtGmGa8KZ0.wav']
 
 
     # set up the network
@@ -298,7 +302,7 @@ if __name__ == '__main__':
 
     # for wav_path in files:
     for j in range(100):
-        wav_path = random.sample(files, 10) # randomly pick some files as the input
+        wav_path = random.sample(files, 30) # randomly pick some files as the input
 
         if os.path.exists(model_cldnn): 
             cldnn.load_state_dict(torch.load(model_cldnn))
@@ -319,34 +323,36 @@ if __name__ == '__main__':
                 optimizer.step()
                 running_loss += loss.item()
                 
-                if idx % 30 == 29:
+                if idx % 100 == 99:
                     print('[pick order %d, inner_epoch %d, batch_idx %d: loss %.5f'
-                        %(j, inner_epoch, idx, running_loss/30))
+                        %(j, inner_epoch, idx, running_loss/100))
                     running_loss = 0.
 
-        torch.save(cldnn.state_dict(), model_cldnn)
+        
         raw_dataset, raw_loader = None, None
         # i += 1
 
 # cldnn = CLDNN().to(devices)
 # cldnn.load_state_dict(torch.load(model_cldnn))
 
+        if j % 2 == 1:
+            valdata = raw_data(wav_val, label_file='../data/val_piece.csv', root_path='../data/val/')
+            valloader = DataLoader(dataset=valdata, batch_size=batch_size)
+            correct = 0
+            total = 0
+            with torch.no_grad():
+                for data in valloader:
+                    inputs, labels = data[0].to(devices), data[1].to(devices)
+                    # print(labels[labels==1].shape)
+                    # print(labels[labels==0].shape)
+                    # print(labels)
+                    outputs = cldnn(inputs)
+                    _, predicted = torch.max(outputs.data, 1)
+                    total += labels.size(0)
+                    correct += (predicted == labels).sum().item()
 
-        valdata = raw_data(wav_val, label_file='../data/val_piece.csv', root_path='../data/val/')
-        valloader = DataLoader(dataset=valdata, batch_size=batch_size)
-        correct = 0
-        total = 0
-        with torch.no_grad():
-            for data in valloader:
-                inputs, labels = data[0].to(devices), data[1].to(devices)
-                # print(labels[labels==1].shape)
-                # print(labels[labels==0].shape)
-                # print(labels)
-                outputs = cldnn(inputs)
-                _, predicted = torch.max(outputs.data, 1)
-                total += labels.size(0)
-                correct += (predicted == labels).sum().item()
-
-        print('Accuracy of the network on the all val inputs: %d %%' % (
-            100 * correct / total))
-        valdata, valloader = None, None
+            print('Accuracy of the network on the all val inputs: %d %%' % (
+                100 * correct / total))
+            valdata, valloader = None, None
+            
+        torch.save(cldnn.state_dict(), model_cldnn)

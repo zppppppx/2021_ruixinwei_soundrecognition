@@ -145,81 +145,76 @@ class CLDNN_mel(nn.Module):
         self.device = 'cuda:0' if torch.cuda.is_available() else 'cpu'
 
         # BatchNorm
-        self.bn1 = nn.BatchNorm1d(1)
+        self.bn1 = nn.BatchNorm2d(64)
         self.bn2 = nn.BatchNorm1d(1)
         self.bn3 = nn.BatchNorm1d(1)
 
-        # Time convolution
-        self.Conv1 = nn.Conv2d(1, 32, 5)
-        self.MP1 = nn.MaxPool2d((2,2))
+        # Bottleneck convolution
+        self.Conv0 = nn.Conv2d(1,32,1) 
+        self.Conv1 = nn.Conv2d(32, 32, 5, padding=(2,2)) 
+        self.Conv2 = nn.Conv2d(32, 64, 5, padding=(2,2))
 
-        #  Frequency convolution
-        self.Conv2 = nn.Conv2d(32, 128, 5)
-        self.MP2 = nn.MaxPool2d((2,2))
+        self.Conv_bot = nn.Conv2d(1, 64, 1) # bottleneck
 
         # LSTM
-        self.LSTM1 = nn.LSTM(input_size=128*6, hidden_size=128, num_layers=3,
-                            batch_first=True, bidirectional=True)
+        self.LSTM1 = nn.LSTM(input_size=36*64, hidden_size=128, num_layers=3,
+                            batch_first=True, bidirectional=True) # Frequency
 
-        self.LSTM2 = nn.LSTM(input_size=320, hidden_size=128, num_layers=2,
-                            batch_first=True, bidirectional=True)
+        # self.LSTM2 = nn.LSTM(input_size=36, hidden_size=64, num_layers=2,
+        #                     batch_first=True, bidirectional=True) # Time
 
-        # DNN
-        self.fc1 = nn.Linear(21*128*2+6*128*2, 512)
-        self.fc2 = nn.Linear(512, 32)
-        self.fc3 = nn. Linear(32, 2)
 
         # Dropout
         self.Dropout0 = nn.Dropout(0.1)
         self.Dropout1 = nn.Dropout(0.2)
         self.Dropout2 = nn.Dropout(0.35)
 
+        # DNN
+        self.fc1 = nn.Linear(128*36*2, 1024)
+        self.fc2 = nn.Linear(1024, 128)
+        self.fc3 = nn. Linear(128, 32)
+        self.fc4 = nn. Linear(32, 2)
+        self.FC = nn.Sequential(self.fc1, nn.ReLU(), self.Dropout2, 
+                                self.fc2, nn.ReLU(), self.Dropout0,
+                                self.fc3, nn.ReLU(),
+                                self.fc4)
+
     def forward(self, inputs):
-        time_inputs = self.bn1(inputs)
-        freq_inputs = inputs
-        time_inputs = time_inputs.reshape(-1, 21, 320)
 
-
-        # extract freq feature and 
-        batchsize = inputs.shape[0]
-        # print(batchsize)
-        mel_spec = transforms.MelSpectrogram(sample_rate=16000, n_fft=400, win_length=320, hop_length=192, n_mels=36).to(self.device)
-        freq = (mel_spec(freq_inputs)+0.00001).log2()
+        mfcc_util = transforms.MFCC(n_mfcc=36, melkwargs={'n_mels':40, 'win_length':320, 
+            'hop_length':192, 'n_fft':400}).to(self.device)
+        # mel_spec = transforms.MelSpectrogram(sample_rate=16000, n_fft=400, win_length=320, hop_length=192, n_mels=36).to(self.device)
+        # freq = (mel_spec(freq_inputs)+0.00001).log2()
+        freq = mfcc_util(inputs)
         
-        # Frequency Conv
-        x = self.Conv1(freq)
-        x = self.Dropout0(x)
-        x = self.MP1(x)
-        x = self.Conv2(x)
-        x = self.MP2(x)
+        # bottleneck
+        bottleneck = self.Conv_bot(freq)
 
-        # Relationship between before and after
-        x = x.permute([0,3,1,2]).reshape((batchsize, 6, -1))
-        x, (h, c) = self.LSTM1(x)
-        # x = x.reshape(batchsize, 1, -1)
-        # x = self.bn2(x)
-        x = x.reshape(batchsize, -1)
+        # Ordinary Conv
+        Ord = F.relu(self.Conv0(freq))
+        Ord = F.relu(self.Conv1(Ord))
+        
+        Ord = self.Dropout1(Ord)
+        Ord = F.relu(self.Conv2(Ord))
+        Ord = self.bn1(Ord)
+        
 
-        # print(x.shape)
+        Res = bottleneck + Ord
+        # bottleneck, Ord = None, None
 
-        # Time feature
-        time, (h, c) = self.LSTM2(time_inputs)
-        # time = time.reshape(batchsize, 1, -1)
-        # time = self.bn3(time)
-        time = time.reshape(batchsize, -1)
-
-        two_feature = torch.cat((x, time), dim=1)
-        # print(two_feature.shape)
+        Res = Res.permute([0,3,1,2]).reshape(-1, 36, 36*64)
+        Res, (h, c) = self.LSTM1(Res)
+        Res = Res.reshape([-1, 128*36*2])
 
         # DNN
-        x = self.fc1(two_feature)
-        x = self.Dropout2(F.relu(x))
-        x = self.fc2(x)
-        # x = self.Dropout1(F.relu(x))
-        x = F.relu(x)
-        x = F.softmax(x, dim=1)
+        x = self.FC(Res)
+        # x = self.Dropout2(F.relu(x))
+        # x = self.fc2(x)
+        # x = self.Dropout0(F.relu(x))
+        # x = F.relu(x)
+        # x = F.softmax(x, dim=1)
 
-        return self.fc3(x)
+        return F.softmax(x, dim=1)
 
 
 class raw_data(Dataset):
@@ -233,7 +228,7 @@ class raw_data(Dataset):
     def frag_load(self, wav_path):
         data = torch.tensor([])
         labels = torch.tensor([])
-        size = 8000
+        size = 5000
         for wav_file in wav_path:
             wav_name = wav_file.split('.')[0]
             wav_file = self.root_path + wav_file
@@ -279,11 +274,13 @@ class raw_data(Dataset):
 if __name__ == '__main__':
     # setting basic parameters
     train_path = '../data/train'
-    model_cldnn = '../saved_models/cldnn_mel_log2.pkl'
+    val_path = '../data/val'
+    model_cldnn = '../saved_models/cldnn_bottle_lstm.pkl'
     files = os.listdir(train_path)
     batch_size = 512
 
-    wav_val = ['J1jDc2rTJlg.wav']
+
+    wav_val = os.listdir(val_path)[:] #['J1jDc2rTJlg.wav','Kb1fduj-jdY.wav','t1LXrJOvPDg.wav', 'yMtGmGa8KZ0.wav']
 
 
     # set up the network
@@ -297,7 +294,7 @@ if __name__ == '__main__':
     #     i = 0
 
     # for wav_path in files:
-    for j in range(100):
+    for j in range(200):
         wav_path = random.sample(files, 10) # randomly pick some files as the input
 
         if os.path.exists(model_cldnn): 
@@ -324,29 +321,29 @@ if __name__ == '__main__':
                         %(j, inner_epoch, idx, running_loss/30))
                     running_loss = 0.
 
-        torch.save(cldnn.state_dict(), model_cldnn)
         raw_dataset, raw_loader = None, None
         # i += 1
 
 # cldnn = CLDNN().to(devices)
 # cldnn.load_state_dict(torch.load(model_cldnn))
 
+        if j % 4 == 3:
+            valdata = raw_data(wav_val, label_file='../data/val_piece.csv', root_path='../data/val/')
+            valloader = DataLoader(dataset=valdata, batch_size=batch_size)
+            correct = 0
+            total = 0
+            with torch.no_grad():
+                for data in valloader:
+                    inputs, labels = data[0].to(devices), data[1].to(devices)
+                    # print(labels[labels==1].shape)
+                    # print(labels[labels==0].shape)
+                    # print(labels)
+                    outputs = cldnn(inputs)
+                    _, predicted = torch.max(outputs.data, 1)
+                    total += labels.size(0)
+                    correct += (predicted == labels).sum().item()
 
-        valdata = raw_data(wav_val, label_file='../data/val_piece.csv', root_path='../data/val/')
-        valloader = DataLoader(dataset=valdata, batch_size=batch_size)
-        correct = 0
-        total = 0
-        with torch.no_grad():
-            for data in valloader:
-                inputs, labels = data[0].to(devices), data[1].to(devices)
-                # print(labels[labels==1].shape)
-                # print(labels[labels==0].shape)
-                # print(labels)
-                outputs = cldnn(inputs)
-                _, predicted = torch.max(outputs.data, 1)
-                total += labels.size(0)
-                correct += (predicted == labels).sum().item()
-
-        print('Accuracy of the network on the all val inputs: %d %%' % (
-            100 * correct / total))
-        valdata, valloader = None, None
+            print('Accuracy of the network on the all val inputs: %d %%' % (
+                100 * correct / total))
+            valdata, valloader = None, None
+            torch.save(cldnn.state_dict(), model_cldnn)
